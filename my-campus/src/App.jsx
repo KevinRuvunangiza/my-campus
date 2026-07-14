@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { LazyMotion, domAnimation, AnimatePresence, m } from "framer-motion";
+import { FiUsers, FiMonitor } from "react-icons/fi";
 
-// Import all Student Screens
+// IMPORT DES VUES ÉTUDIANT
 import StudentDashboard from "./components/screens/student/Dashboard";
 import Explore from "./components/screens/student/Explore";
 import Progress from "./components/screens/student/Progress";
@@ -10,34 +11,57 @@ import PaymentModal from "./components/screens/student/PaymentModal";
 import SyllabusReader from "./components/screens/student/SyllabusReader";
 import McqArena from "./components/screens/student/McqArena";
 
-export default function App() {
-  // 1. Primary Bottom Navigation State ('home' | 'explore' | 'progress' | 'profile')
-  const [activeTab, setActiveTab] = useState("home");
+// IMPORT DE LA VUE PROFESSEUR
+import LecturerPortal from "./components/screens/lecturer/Portal";
 
-  // 2. Full-Screen & Modal Overlay States
+export default function App() {
+  // ---------------------------------------------------------------------------
+  // COMMUTATEUR MAÎTRE TEMPORAIRE : 'student' vs 'lecturer'
+  // ---------------------------------------------------------------------------
+  const [viewMode, setViewMode] = useState("student");
+
+  // États du routeur Étudiant
+  const [activeTab, setActiveTab] = useState("home");
   const [selectedCourseForPaywall, setSelectedCourseForPaywall] = useState(null);
   const [activeReaderCourse, setActiveReaderCourse] = useState(null);
   const [activeArenaCourse, setActiveArenaCourse] = useState(null);
 
-  // Handler: When a course card is clicked anywhere in the app
   const handleCourseSelect = (course) => {
-    if (course.isUnlocked) {
-      // Open full-screen Canvas Reader
-      setActiveReaderCourse(course);
-    } else {
-      // Trigger USSD Mobile Money Paywall
-      setSelectedCourseForPaywall(course);
-    }
+    if (course.isUnlocked) setActiveReaderCourse(course);
+    else setSelectedCourseForPaywall(course);
   };
 
-  // Handler: When Mobile Money payment succeeds
   const handlePaymentSuccess = (courseId) => {
-    console.log(`Course ${courseId} unlocked successfully via USSD!`);
+    console.log(`Syllabus ${courseId} débloqué via USSD FlexPay !`);
     setSelectedCourseForPaywall(null);
-    setActiveTab("progress"); // Route to progress to see newly unlocked stats
+    setActiveTab("progress");
   };
 
-  // OVERRIDE 1: Full-screen Syllabus Canvas Reader
+  // ===========================================================================
+  // 1. VUE PORTAIL PROFESSEUR (BUREAU)
+  // ===========================================================================
+  if (viewMode === "lecturer") {
+    return (
+      <>
+        <LecturerPortal onSwitchToStudent={() => setViewMode("student")} />
+        
+        {/* PILULE FLOTTANTE DE COMMUTATION TEMPORAIRE */}
+        <div className="fixed bottom-6 right-6 z-50">
+          <button
+            onClick={() => setViewMode("student")}
+            className="bg-[#00ED64] hover:bg-[#00c753] text-[#001E2B] font-extrabold px-5 py-3 rounded-full shadow-[0_8px_30px_rgba(0,237,100,0.4)] flex items-center gap-2 text-xs cursor-pointer border-2 border-[#001E2B] transition-transform hover:scale-105"
+          >
+            <FiUsers className="w-4 h-4" />
+            <span>Basculer sur Vue PWA Étudiant</span>
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  // ===========================================================================
+  // 2. SURCHARGES ÉTUDIANT (Plein écran : Lecteur Canvas ou Arène QCM)
+  // ===========================================================================
   if (activeReaderCourse) {
     return (
       <LazyMotion features={domAnimation} strict>
@@ -51,7 +75,6 @@ export default function App() {
     );
   }
 
-  // OVERRIDE 2: Full-screen Timed MCQ Practice Arena
   if (activeArenaCourse) {
     return (
       <LazyMotion features={domAnimation} strict>
@@ -67,20 +90,16 @@ export default function App() {
     );
   }
 
+  // ===========================================================================
+  // 3. VUE PWA ÉTUDIANT STANDARD (MOBILE-FIRST)
+  // ===========================================================================
   return (
     <LazyMotion features={domAnimation} strict>
       <div className="min-h-screen bg-[#0A222F] text-white selection:bg-[#00ED64] selection:text-[#001E2B] font-sans">
         
-        {/* VIEW ROUTER WITH SMOOTH FADE TRANSITIONS */}
         <AnimatePresence mode="wait">
           {activeTab === "home" && (
-            <m.div
-              key="home"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
+            <m.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <StudentDashboard
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
@@ -91,13 +110,7 @@ export default function App() {
           )}
 
           {activeTab === "explore" && (
-            <m.div
-              key="explore"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
+            <m.div key="explore" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <Explore
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
@@ -107,13 +120,7 @@ export default function App() {
           )}
 
           {activeTab === "progress" && (
-            <m.div
-              key="progress"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
+            <m.div key="progress" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <Progress
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
@@ -123,19 +130,13 @@ export default function App() {
           )}
 
           {activeTab === "profile" && (
-            <m.div
-              key="profile"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
+            <m.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <Profile activeTab={activeTab} setActiveTab={setActiveTab} />
             </m.div>
           )}
         </AnimatePresence>
 
-        {/* MOBILE MONEY PAYWALL MODAL OVERLAY */}
+        {/* MODALE DE PAIEMENT USSD */}
         <AnimatePresence>
           {selectedCourseForPaywall && (
             <PaymentModal
@@ -145,6 +146,17 @@ export default function App() {
             />
           )}
         </AnimatePresence>
+
+        {/* PILULE FLOTTANTE DE COMMUTATION TEMPORAIRE */}
+        <div className="fixed bottom-20 right-4 z-50 md:bottom-6 md:right-6">
+          <button
+            onClick={() => setViewMode("lecturer")}
+            className="bg-[#00ED64] hover:bg-[#00c753] text-[#001E2B] font-extrabold px-4 py-2.5 rounded-full shadow-[0_8px_30px_rgba(0,237,100,0.4)] flex items-center gap-2 text-xs cursor-pointer border-2 border-[#001E2B] transition-transform hover:scale-105"
+          >
+            <FiMonitor className="w-4 h-4" />
+            <span>Basculer sur Espace Prof (Bureau)</span>
+          </button>
+        </div>
 
       </div>
     </LazyMotion>

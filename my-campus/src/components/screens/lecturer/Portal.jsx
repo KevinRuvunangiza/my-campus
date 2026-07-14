@@ -4,9 +4,10 @@ import { LazyMotion, domAnimation, AnimatePresence, m } from "framer-motion";
 // Import du layout
 import Sidebar from "../../layout/lecturer/Sidebar";
 import TopNavbar from "../../layout/lecturer/TopNavbar";
-
-// Import des écrans
 import LecturerDashboard from "./Dashboard";
+import SyllabusManager from "./SyllabusManager";
+import QcmBuilder from "./QcmBuilder";
+import Financials from "./Financials";
 
 export default function LecturerPortal({ onSwitchToStudent }) {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -45,24 +46,39 @@ export default function LecturerPortal({ onSwitchToStudent }) {
                 </m.div>
               )}
 
-              {/* Les écrans Syllabus, QCM et Financier seront injectés ici au prochain tour */}
-              {activeTab !== "dashboard" && (
+              {activeTab === "syllabus" && (
                 <m.div
-                  key="placeholder"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="p-12 text-center space-y-4"
+                  key="syllabus"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
                 >
-                  <div className="w-16 h-16 bg-[#162C3D] border border-[#00ED64]/30 rounded-2xl mx-auto flex items-center justify-center text-2xl animate-pulse">
-                    ⚡
-                  </div>
-                  <h3 className="text-lg font-bold text-white">
-                    Module en cours de montage...
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Nous construisons l'interface {activeTab.toUpperCase()} au
-                    prochain tour !
-                  </p>
+                  <SyllabusManager />
+                </m.div>
+              )}
+
+              {activeTab === "qcm" && (
+                <m.div
+                  key="qcm"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <QcmBuilder />
+                </m.div>
+              )}
+
+              {activeTab === "financials" && (
+                <m.div
+                  key="financials"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Financials />
                 </m.div>
               )}
             </AnimatePresence>

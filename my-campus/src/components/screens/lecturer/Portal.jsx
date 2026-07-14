@@ -4,7 +4,10 @@ import { LazyMotion, domAnimation, AnimatePresence, m } from "framer-motion";
 // Import du layout
 import Sidebar from "../../layout/lecturer/Sidebar";
 import TopNavbar from "../../layout/lecturer/TopNavbar";
+
+// Import des écrans Professeur
 import LecturerDashboard from "./Dashboard";
+import StudentAnalytics from "./StudentAnalytics"; // <-- NOUVEAU : Import du suivi étudiants
 import SyllabusManager from "./SyllabusManager";
 import QcmBuilder from "./QcmBuilder";
 import Financials from "./Financials";
@@ -43,6 +46,19 @@ export default function LecturerPortal({ onSwitchToStudent }) {
                   transition={{ duration: 0.15 }}
                 >
                   <LecturerDashboard onNavigate={(tab) => setActiveTab(tab)} />
+                </m.div>
+              )}
+
+              {/* NOUVEAU : Route pour le Suivi Pédagogique & Analytique */}
+              {activeTab === "students" && (
+                <m.div
+                  key="students"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <StudentAnalytics />
                 </m.div>
               )}
 

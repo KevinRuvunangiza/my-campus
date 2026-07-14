@@ -1,18 +1,19 @@
-
 import { m } from "framer-motion";
 import {
   FiGrid,
   FiBook,
   FiCheckSquare,
   FiDollarSign,
+  FiUsers,
   FiChevronLeft,
   FiChevronRight,
   FiShield,
   FiExternalLink,
-} from "react-icons/fi";
+} from "react-icons/fi"; // Added FiUsers
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "Tableau de Bord", icon: FiGrid },
+  { id: "students", label: "Suivi des Étudiants", icon: FiUsers }, 
   { id: "syllabus", label: "Mes Syllabus & TP", icon: FiBook },
   { id: "qcm", label: "Banque de QCM", icon: FiCheckSquare },
   { id: "financials", label: "Revenus & Retraits", icon: FiDollarSign },

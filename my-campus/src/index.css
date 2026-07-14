@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-forest: #001E2B;
+    --card-forest: #1C2D38;
+    --border-forest: #3D4F58;
+    --mongo-neon: #00ED64;
+    --mongo-green: #00684A;
+  }
+}

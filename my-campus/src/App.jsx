@@ -3,13 +3,18 @@ import { LazyMotion, domAnimation, AnimatePresence, m } from "framer-motion";
 import { FiUsers, FiMonitor, FiLogOut } from "react-icons/fi";
 
 // =============================================================================
-// 1. IMPORT PUBLIC & AUTH SCREENS
+// 1. IMPORT SUPABASE AUTH HOOK
+// =============================================================================
+import { useAuth } from "./hooks/useAuth";
+
+// =============================================================================
+// 2. IMPORT PUBLIC & AUTH SCREENS
 // =============================================================================
 import LandingPage from "./components/screens/public/LandingPage";
 import AuthScreen from "./components/screens/auth/AuthScreen";
 
 // =============================================================================
-// 2. IMPORT STUDENT PWA SCREENS
+// 3. IMPORT STUDENT PWA SCREENS
 // =============================================================================
 import StudentDashboard from "./components/screens/student/Dashboard";
 import Explore from "./components/screens/student/Explore";
@@ -20,56 +25,55 @@ import SyllabusReader from "./components/screens/student/SyllabusReader";
 import McqArena from "./components/screens/student/McqArena";
 
 // =============================================================================
-// 3. IMPORT LECTURER PORTAL (DESKTOP)
+// 4. IMPORT LECTURER PORTAL (DESKTOP)
 // =============================================================================
 import LecturerPortal from "./components/screens/lecturer/Portal";
 
 export default function App() {
   // ---------------------------------------------------------------------------
-  // MASTER APPLICATION & SESSION STATE
+  // LIVE SUPABASE SESSION & USER STATE
   // ---------------------------------------------------------------------------
-  const [showLanding, setShowLanding] = useState(true); // Defaults to Monolith Landing Page
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userProfile, setUserProfile] = useState(null);
-  const [viewMode, setViewMode] = useState("student"); // 'student' | 'lecturer'
+  const { userProfile, loading, logout } = useAuth();
 
-  // Captures if the user clicked "Connexion" vs "S'inscrire" and their intended role
+  // Public vs. Auth Navigation State
+  const [showLanding, setShowLanding] = useState(true);
   const [authIntent, setAuthIntent] = useState({
     mode: "login",
     role: "student",
   });
 
   // ---------------------------------------------------------------------------
-  // STUDENT PWA ROUTING STATES
+  // TEMPORARY MASTER VIEW SWITCHER ('student' vs 'lecturer' for testing)
   // ---------------------------------------------------------------------------
-  const [activeTab, setActiveTab] = useState("home"); // 'home' | 'explore' | 'progress' | 'profile'
+  const [viewMode, setViewMode] = useState("student");
+
+  // Student PWA Tab & Paywall States
+  const [activeTab, setActiveTab] = useState("home");
   const [selectedCourseForPaywall, setSelectedCourseForPaywall] =
     useState(null);
   const [activeReaderCourse, setActiveReaderCourse] = useState(null);
   const [activeArenaCourse, setActiveArenaCourse] = useState(null);
 
   // ---------------------------------------------------------------------------
-  // NAVIGATION & AUTH HANDLERS
+  // HANDLERS
   // ---------------------------------------------------------------------------
   const handleNavigateToAuth = (mode, role) => {
     setAuthIntent({ mode, role });
-    setShowLanding(false); // Transitions from public site to login/signup
+    setShowLanding(false);
   };
 
   const handleAuthSuccess = ({ role, user }) => {
-    setUserProfile(user);
-    setViewMode(role); // Automatically routes to the dashboard matching their role
-    setIsAuthenticated(true);
+    // When registration/login finishes, align viewMode to their role
+    setViewMode(role);
+    setShowLanding(false);
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setUserProfile(null);
-    setShowLanding(true); // Sends the user back to the public Monolith landing page
+  const handleLogout = async () => {
+    await logout();
+    setShowLanding(true);
     setActiveTab("home");
   };
 
-  // Course selection logic (Routes to Canvas Reader if unlocked, Paywall if locked)
   const handleCourseSelect = (course) => {
     if (course.isUnlocked) {
       setActiveReaderCourse(course);
@@ -78,17 +82,34 @@ export default function App() {
     }
   };
 
-  // FlexPay / CinetPay USSD Success Callback
   const handlePaymentSuccess = (courseId) => {
-    console.log(`Syllabus ${courseId} débloqué via USSD Mobile Money !`);
+    console.log(
+      `⚡ [Monolith USSD] Syllabus ${courseId} débloqué via FlexPay !`,
+    );
     setSelectedCourseForPaywall(null);
-    setActiveTab("progress"); // Routes to progress tab so they can see their new stats
+    setActiveTab("progress");
   };
+
+  // ===========================================================================
+  // GATEKEEPER 0: INITIAL SUPABASE SESSION LOADING
+  // ===========================================================================
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#06141D] flex items-center justify-center text-white font-mono selection:bg-[#00ED64]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-[#00ED64] border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(0,237,100,0.4)]" />
+          <p className="text-xs text-slate-400 tracking-wider uppercase">
+            Chargement de My Campus...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // ===========================================================================
   // GATEKEEPER 1: PUBLIC LANDING PAGE (MONOLITH / USCITECH)
   // ===========================================================================
-  if (showLanding && !isAuthenticated) {
+  if (!userProfile && showLanding) {
     return (
       <LazyMotion features={domAnimation} strict>
         <LandingPage onNavigateToAuth={handleNavigateToAuth} />
@@ -99,7 +120,7 @@ export default function App() {
   // ===========================================================================
   // GATEKEEPER 2: AUTHENTICATION SCREEN (LOGIN / SIGNUP)
   // ===========================================================================
-  if (!isAuthenticated) {
+  if (!userProfile && !showLanding) {
     return (
       <LazyMotion features={domAnimation} strict>
         <AuthScreen
@@ -111,13 +132,21 @@ export default function App() {
     );
   }
 
+  // Determine active display mode based on user's real DB role OR your switcher
+  const isLecturerView =
+    viewMode === "lecturer" ||
+    (userProfile?.role === "lecturer" && viewMode !== "student");
+
   // ===========================================================================
   // AUTHENTICATED: LECTURER DESKTOP PORTAL VIEW
   // ===========================================================================
-  if (viewMode === "lecturer") {
+  if (isLecturerView) {
     return (
       <>
-        <LecturerPortal onSwitchToStudent={() => setViewMode("student")} />
+        <LecturerPortal
+          user={userProfile}
+          onSwitchToStudent={() => setViewMode("student")}
+        />
 
         {/* TEMPORARY FLOATING SWITCHER BUTTON (TESTING UTILITY) */}
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2">
@@ -150,9 +179,9 @@ export default function App() {
       <LazyMotion features={domAnimation} strict>
         <SyllabusReader
           course={activeReaderCourse}
-          // DYNAMIC DRM ANCHOR: Burns logged-in user's identity into the 15% opacity watermark
-          studentName={userProfile?.fullName || "KEVIN RUVUNANGIZA"}
-          studentPhone={userProfile?.phone || "084 123 4567"}
+          // DYNAMIC DRM ANCHOR: Burns real user identity from Supabase into the watermark!
+          studentName={userProfile?.full_name || "Écolier USCITECH"}
+          studentPhone={userProfile?.phone_number || "084 000 0000"}
           onBack={() => setActiveReaderCourse(null)}
         />
       </LazyMotion>
@@ -192,6 +221,7 @@ export default function App() {
               transition={{ duration: 0.15 }}
             >
               <StudentDashboard
+                user={userProfile}
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
                 onOpenReader={(course) => setActiveReaderCourse(course)}
@@ -209,6 +239,7 @@ export default function App() {
               transition={{ duration: 0.15 }}
             >
               <Explore
+                user={userProfile}
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
                 onSelectCourse={handleCourseSelect}
@@ -225,6 +256,7 @@ export default function App() {
               transition={{ duration: 0.15 }}
             >
               <Progress
+                user={userProfile}
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
                 onOpenArena={(course) => setActiveArenaCourse(course)}
@@ -241,6 +273,7 @@ export default function App() {
               transition={{ duration: 0.15 }}
             >
               <Profile
+                user={userProfile}
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
                 onLogout={handleLogout}
@@ -254,6 +287,7 @@ export default function App() {
           {selectedCourseForPaywall && (
             <PaymentModal
               course={selectedCourseForPaywall}
+              user={userProfile}
               onClose={() => setSelectedCourseForPaywall(null)}
               onSuccess={handlePaymentSuccess}
             />

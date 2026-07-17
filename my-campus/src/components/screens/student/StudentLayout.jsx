@@ -1,21 +1,15 @@
 // src/components/screens/student/StudentLayout.jsx
-//
-// Monolith. — "My Campus"
-// Wraps the student PWA. Tabs (home/explore/progress/profile) and the
-// full-screen reader/arena overlays are now real routes instead of
-// component-swap state, so the browser back button and page refresh
-// behave the way a student expects on a mobile PWA.
-
-import { AnimatePresence, m } from "framer-motion";
+import React, { useState } from "react";
+import { LazyMotion, domAnimation, AnimatePresence, m } from "framer-motion";
 import {
   Routes,
   Route,
   useNavigate,
   useLocation,
-  useParams,
+  Navigate,
 } from "react-router-dom";
-import { useState } from "react";
 import { useAuth } from "../../../hooks/useAuth";
+
 import StudentDashboard from "./Dashboard";
 import Explore from "./Explore";
 import Progress from "./Progress";
@@ -24,29 +18,20 @@ import PaymentModal from "./PaymentModal";
 import SyllabusReader from "./SyllabusReader";
 import McqArena from "./McqArena";
 
-// --- Reader route ------------------------------------------------------
-// Expects the course object via router `state` (passed by navigate()).
-// If it's missing — e.g. someone hit this URL directly or refreshed —
-// we bounce back to /student rather than rendering a broken reader.
-// TODO: once courseService exposes a `getCourseById`, fetch by
-// `useParams().courseId` here as a fallback instead of bouncing.
+// 💥 PROTECTION DES SOUS-ROUTES
 function ReaderRoute() {
   const { state } = useLocation();
-  const navigate = useNavigate();
   const { userProfile } = useAuth();
   const course = state?.course;
 
-  if (!course) {
-    navigate("/student", { replace: true });
-    return null;
-  }
+  if (!course) return <Navigate to="/student" replace />;
 
   return (
     <SyllabusReader
       course={course}
-      studentName={userProfile?.full_name || "Écolier USCITECH"}
+      studentName={userProfile?.full_name || "Étudiant USCITECH"}
       studentPhone={userProfile?.phone_number || "084 000 0000"}
-      onBack={() => navigate(-1)}
+      onBack={() => window.history.back()}
     />
   );
 }
@@ -56,10 +41,7 @@ function ArenaRoute() {
   const navigate = useNavigate();
   const course = state?.course;
 
-  if (!course) {
-    navigate("/student", { replace: true });
-    return null;
-  }
+  if (!course) return <Navigate to="/student" replace />;
 
   return (
     <McqArena
@@ -70,18 +52,14 @@ function ArenaRoute() {
   );
 }
 
-// Maps the current URL to the tab keys your existing screens already
-// expect ("home" | "explore" | "progress" | "profile"), so their internal
-// bottom nav bar keeps working unchanged.
+// 💥 GESTIONNAIRE D'ONGLETS INTELLIGENT
 function useActiveTab() {
   const location = useLocation();
   const navigate = useNavigate();
-
-  const segment = location.pathname.split("/")[2]; // "/student/<segment>"
-  const activeTab =
-    segment === "explore" || segment === "progress" || segment === "profile"
-      ? segment
-      : "home";
+  const segment = location.pathname.split("/")[2];
+  const activeTab = ["explore", "progress", "profile"].includes(segment)
+    ? segment
+    : "home";
 
   const setActiveTab = (tab) => {
     navigate(tab === "home" ? "/student" : `/student/${tab}`);
@@ -90,6 +68,9 @@ function useActiveTab() {
   return [activeTab, setActiveTab];
 }
 
+// ============================================================================
+// MASTER LAYOUT ÉTUDIANT
+// ============================================================================
 export default function StudentLayout() {
   const { userProfile, logout } = useAuth();
   const navigate = useNavigate();
@@ -111,88 +92,91 @@ export default function StudentLayout() {
   };
 
   const handlePaymentSuccess = (courseId) => {
-    console.log(
-      `⚡ [Monolith USSD] Syllabus ${courseId} débloqué via FlexPay !`,
-    );
     setSelectedCourseForPaywall(null);
-    navigate("/student/progress");
+    navigate("/student/progress", { replace: true });
   };
 
-  const openArena = (course) =>
+  const openArena = (course) => {
     navigate(`/student/course/${course.id}/arena`, { state: { course } });
+  };
 
   return (
-    <div className="min-h-screen bg-[#0A222F] text-white selection:bg-[#00ED64] selection:text-[#001E2B] font-sans">
-      <AnimatePresence mode="wait">
-        <m.div
-          key={useLocation().pathname}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-        >
-          <Routes>
-            <Route
-              index
-              element={
-                <StudentDashboard
-                  user={userProfile}
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  onOpenReader={handleCourseSelect}
-                  onOpenArena={openArena}
-                />
-              }
-            />
-            <Route
-              path="explore"
-              element={
-                <Explore
-                  user={userProfile}
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  onSelectCourse={handleCourseSelect}
-                />
-              }
-            />
-            <Route
-              path="progress"
-              element={
-                <Progress
-                  user={userProfile}
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  onOpenArena={openArena}
-                />
-              }
-            />
-            <Route
-              path="profile"
-              element={
-                <Profile
-                  user={userProfile}
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  onLogout={handleLogout}
-                />
-              }
-            />
-            <Route path="course/:courseId/reader" element={<ReaderRoute />} />
-            <Route path="course/:courseId/arena" element={<ArenaRoute />} />
-          </Routes>
-        </m.div>
-      </AnimatePresence>
+    // 💥 CORRECTION ÉCRAN BLANC: Injection de domAnimation obligatoire pour <m.div> !
+    <LazyMotion features={domAnimation} strict>
+      <div className="min-h-screen bg-[#0A222F] text-white selection:bg-[#00ED64] selection:text-[#001E2B] font-sans">
+        <AnimatePresence mode="wait">
+          <m.div
+            key={useLocation().pathname}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="flex-1 flex flex-col min-h-screen"
+          >
+            <Routes>
+              <Route
+                index
+                element={
+                  <StudentDashboard
+                    user={userProfile}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    onOpenReader={handleCourseSelect}
+                    onOpenArena={openArena}
+                  />
+                }
+              />
+              <Route
+                path="explore"
+                element={
+                  <Explore
+                    user={userProfile}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    onSelectCourse={handleCourseSelect}
+                  />
+                }
+              />
+              <Route
+                path="progress"
+                element={
+                  <Progress
+                    user={userProfile}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    onOpenArena={openArena}
+                  />
+                }
+              />
+              <Route
+                path="profile"
+                element={
+                  <Profile
+                    user={userProfile}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    onLogout={handleLogout}
+                  />
+                }
+              />
+              <Route path="course/:courseId/reader" element={<ReaderRoute />} />
+              <Route path="course/:courseId/arena" element={<ArenaRoute />} />
+              <Route path="*" element={<Navigate to="/student" replace />} />
+            </Routes>
+          </m.div>
+        </AnimatePresence>
 
-      <AnimatePresence>
-        {selectedCourseForPaywall && (
-          <PaymentModal
-            course={selectedCourseForPaywall}
-            user={userProfile}
-            onClose={() => setSelectedCourseForPaywall(null)}
-            onSuccess={handlePaymentSuccess}
-          />
-        )}
-      </AnimatePresence>
-    </div>
+        <AnimatePresence>
+          {selectedCourseForPaywall && (
+            <PaymentModal
+              course={selectedCourseForPaywall}
+              user={userProfile}
+              onClose={() => setSelectedCourseForPaywall(null)}
+              onSuccess={handlePaymentSuccess}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+    </LazyMotion>
   );
 }

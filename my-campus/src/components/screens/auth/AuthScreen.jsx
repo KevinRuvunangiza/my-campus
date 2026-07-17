@@ -1,5 +1,5 @@
 // src/components/screens/auth/AuthScreen.jsx
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../../../hooks/useAuth";
 import {
@@ -19,7 +19,7 @@ import {
 export default function AuthScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, signup } = useAuth();
+  const { login, signup, userProfile } = useAuth();
 
   // Read router state passed from LandingPage or default to student login
   const { mode: initialMode = "login", role: initialRole = "student" } =
@@ -40,6 +40,34 @@ export default function AuthScreen() {
   const [department, setDepartment] = useState("");
   const [academicTitle, setAcademicTitle] = useState("");
 
+  // login()/signup() only resolve the Supabase session; `userProfile`
+  // (role, is_verified) arrives a beat later via the onAuthStateChange
+  // listener inside useAuth. We flag that a redirect is owed, then this
+  // effect fires the actual navigation once the profile lands — this is
+  // the ONLY place that decides where a user goes after auth.
+  const pendingRedirect = useRef(false);
+
+  useEffect(() => {
+    if (!pendingRedirect.current || !userProfile) return;
+    pendingRedirect.current = false;
+
+    const from = location.state?.from?.pathname;
+
+    if (userProfile.role === "lecturer") {
+      if (userProfile.is_verified) {
+        navigate(from?.startsWith("/lecturer") ? from : "/lecturer", {
+          replace: true,
+        });
+      } else {
+        navigate("/lecturer/verification-pending", { replace: true });
+      }
+    } else {
+      navigate(from?.startsWith("/student") ? from : "/student", {
+        replace: true,
+      });
+    }
+  }, [userProfile, navigate, location.state]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -49,8 +77,10 @@ export default function AuthScreen() {
     try {
       if (isLogin) {
         await login(email, password);
-        const from = location.state?.from?.pathname || "/student";
-        navigate(from, { replace: true });
+        pendingRedirect.current = true;
+        // Don't setLoading(false) here — the redirect effect above will
+        // navigate away momentarily; leaving the spinner on avoids a
+        // flash of the empty form while userProfile resolves.
       } else {
         const result = await signup({
           email,
@@ -72,7 +102,7 @@ export default function AuthScreen() {
         }
 
         if (result.status === "signed_in") {
-          navigate("/student", { replace: true });
+          pendingRedirect.current = true;
         }
       }
     } catch (err) {

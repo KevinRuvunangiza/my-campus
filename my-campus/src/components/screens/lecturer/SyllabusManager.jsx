@@ -1,224 +1,329 @@
-import{ useState, useRef, useEffect } from "react";
-import { m } from "framer-motion";
-import { 
-  FiUploadCloud, FiFileText, FiShield, FiCheckCircle, 
-  FiEye, FiDollarSign, FiTag, FiLayers, FiAlertCircle 
+// src/components/screens/lecturer/SyllabusManager.jsx
+import React, { useState } from "react";
+import {
+  FiUploadCloud,
+  FiTrash2,
+  FiAlertTriangle,
+  FiFileText,
+  FiCheckCircle,
+  FiHelpCircle,
+  FiShield,
 } from "react-icons/fi";
 
-export default function SyllabusManager() {
-  const [title, setTitle] = useState("Algorithmique & Structures de Données II");
-  const [department, setDepartment] = useState("Faculté d'Informatique");
-  const [priceFc, setPriceFc] = useState(3500);
-  const [isPublished, setIsPublished] = useState(true);
-  const [fileName, setFileName] = useState("Syllabus_Algo_L2_2026.pdf");
-  const [fileSize, setFileSize] = useState("14.2 MB");
-  const [demoStudent, setDemoStudent] = useState({ name: "JEAN-PAUL MBALE", phone: "084 123 4567" });
-  
-  const canvasRef = useRef(null);
+export default function SyllabusManager({
+  courses = [],
+  totalSyllabiCount = 0,
+  isCapReached = false,
+  onUploadSyllabus,
+  onDeleteSyllabus,
+}) {
+  const [selectedCourseId, setSelectedCourseId] = useState("");
+  const [customTitle, setCustomTitle] = useState("");
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [localError, setLocalError] = useState(null);
 
-  // Moteur de rendu du Simulateur DRM Canvas en direct
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    
-    const width = 450;
-    const height = 600;
-    canvas.width = width;
-    canvas.height = height;
+  const handleFileChange = (e) => {
+    setLocalError(null);
+    const selected = e.target.files[0];
+    if (!selected) return;
 
-    // 1. Fond de page type papier
-    ctx.fillStyle = "#FDFBF7";
-    ctx.fillRect(0, 0, width, height);
-
-    // 2. Faux contenu du syllabus
-    ctx.fillStyle = "#1A2E3B";
-    ctx.font = "bold 18px sans-serif";
-    ctx.fillText(title.substring(0, 35) + "...", 30, 50);
-
-    ctx.fillStyle = "#4A5D6B";
-    ctx.font = "12px monospace";
-    ctx.fillText(`${department.toUpperCase()} • DOCUMENT PROTEGE`, 30, 75);
-
-    // Lignes de texte fictives
-    ctx.fillStyle = "#2C3E50";
-    for (let i = 0; i < 12; i++) {
-      const lineWidth = i % 3 === 0 ? width - 120 : width - 60;
-      ctx.fillRect(30, 110 + i * 35, lineWidth, 10);
-      ctx.fillStyle = "#E2E8F0";
-      ctx.fillRect(30, 125 + i * 35, width - 80, 3);
-      ctx.fillStyle = "#2C3E50";
+    // 💥 10 MB FRONTEND GUARD: Prevents wasting Kinshasa 3G/4G bandwidth
+    const MAX_BYTES = 10 * 1024 * 1024;
+    if (selected.size > MAX_BYTES) {
+      const sizeMb = (selected.size / (1024 * 1024)).toFixed(1);
+      setLocalError(
+        `Fichier trop volumineux (${sizeMb} Mo). La taille limite pour un syllabus est de 10 Mo.`,
+      );
+      e.target.value = null; // Clear input
+      setFile(null);
+      return;
     }
 
-    // 3. LE FILIGRANE ANTI-PIRATAGE (15% opacité, rotation -30°)
-    ctx.save();
-    ctx.fillStyle = "rgba(0, 30, 43, 0.15)";
-    ctx.font = "bold 15px monospace";
-    ctx.rotate(-Math.PI / 6);
-
-    for (let x = -width; x < width * 2; x += 220) {
-      for (let y = -height; y < height * 2; y += 130) {
-        ctx.fillText(`ACHETE PAR: ${demoStudent.name}`, x, y);
-        ctx.fillText(`TEL: ${demoStudent.phone} • NO DIFFUSION`, x, y + 18);
-      }
+    if (selected.type !== "application/pdf") {
+      setLocalError(
+        "Format invalide. Seuls les fichiers au format PDF (.pdf) sont acceptés.",
+      );
+      e.target.value = null;
+      setFile(null);
+      return;
     }
-    ctx.restore();
 
-    ctx.fillStyle = "#718096";
-    ctx.font = "11px sans-serif";
-    ctx.fillText("Page 1 sur 14 • Protection DRM Active via Supabase", 30, height - 20);
+    setFile(selected);
+    if (!customTitle) {
+      setCustomTitle(selected.name.replace(/\.pdf$/i, ""));
+    }
+  };
 
-  }, [title, department, demoStudent]);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!file || !selectedCourseId) {
+      setLocalError("Veuillez sélectionner un cours et un fichier PDF valide.");
+      return;
+    }
+
+    setUploading(true);
+    setLocalError(null);
+
+    const success = await onUploadSyllabus(file, selectedCourseId, customTitle);
+    if (success) {
+      setFile(null);
+      setCustomTitle("");
+      // Reset file input element
+      const fileInput = document.getElementById("syllabus-file-input");
+      if (fileInput) fileInput.value = null;
+    }
+    setUploading(false);
+  };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 font-sans">
-      
-      {/* EN-TÊTE */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
-            <FiLayers className="text-[#00ED64]" /> Gestion des Syllabus & TP
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">Uploadez vos supports et vérifiez l'application du filigrane anti-piratage en temps réel.</p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-mono text-slate-400">Statut de diffusion:</span>
-          <button
-            onClick={() => setIsPublished(!isPublished)}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all ${
-              isPublished 
-                ? "bg-[#00684A] text-[#00ED64] border border-[#00ED64]/30" 
-                : "bg-slate-800 text-slate-400 border border-slate-700"
+    <div className="space-y-8">
+      {/* ALLOCATION CAP BANNER */}
+      <div
+        className={`p-6 rounded-3xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl ${
+          isCapReached
+            ? "bg-rose-950/60 border-rose-500/60 text-rose-200"
+            : "bg-[#162C3D]/80 border-[#3D4F58]/60 text-slate-200"
+        }`}
+      >
+        <div className="flex items-center gap-4">
+          <div
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 text-xl font-bold font-mono ${
+              isCapReached
+                ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                : "bg-[#00ED64]/10 text-[#00ED64] border border-[#00ED64]/20"
             }`}
           >
-            <FiCheckCircle className="w-3.5 h-3.5" />
-            {isPublished ? "Publié sur le Marché" : "Brouillon (Masqué)"}
-          </button>
+            {totalSyllabiCount}/5
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-extrabold text-white text-base">
+                Quota d'hébergement Syllabus
+              </h3>
+              {isCapReached && (
+                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-rose-500 font-bold text-white">
+                  Plafond Atteint
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {isCapReached
+                ? "Vous avez atteint votre allocation standard de 5 syllabus. Supprimez un ancien document pour libérer de l'espace."
+                : `Vous pouvez encore héberger ${5 - totalSyllabiCount} syllabus PDF protégés pour ce semestre académique.`}
+            </p>
+          </div>
+        </div>
+
+        <div className="w-full sm:w-auto text-right font-mono text-xs bg-[#0A222F] px-4 py-2.5 rounded-xl border border-[#3D4F58]/40">
+          <span>DRM Canvas : </span>
+          <strong className="text-[#00ED64]">Actif sur 100%</strong>
         </div>
       </div>
 
-      {/* GRILLE 2 COLONNES : FORMULAIRE À GAUCHE, SIMULATEUR À DROITE */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
-        {/* COLONNE GAUCHE (7 SPANS) : ZONE D'UPLOAD & MÉTADONNÉES */}
-        <div className="lg:col-span-7 space-y-6">
-          
-          {/* Zone de Drop PDF */}
-          <div className="bg-[#162C3D] border-2 border-dashed border-[#3D4F58] hover:border-[#00ED64]/60 rounded-3xl p-8 text-center transition-all group cursor-pointer">
-            <div className="w-16 h-16 rounded-2xl bg-[#0A222F] text-[#00ED64] flex items-center justify-center mx-auto mb-4 border border-[#3D4F58]/50 group-hover:scale-110 transition-transform">
-              <FiUploadCloud className="w-8 h-8" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        {/* PDF UPLOADER FORM */}
+        <div className="bg-[#162C3D]/80 border border-[#3D4F58]/60 p-6 rounded-3xl space-y-4 shadow-xl">
+          <div className="flex items-center gap-2.5 border-b border-[#3D4F58]/40 pb-4">
+            <div className="w-8 h-8 rounded-lg bg-[#00ED64]/20 text-[#00ED64] flex items-center justify-center font-bold">
+              <FiUploadCloud className="w-4 h-4" />
             </div>
-            <h3 className="text-sm font-bold text-white">Glissez-déposez votre livret TP ou Syllabus (PDF)</h3>
-            <p className="text-xs text-slate-400 mt-1">Taille maximale recommandée : 50 Mo • Rendu Canvas en streaming</p>
-            
-            {fileName && (
-              <div className="mt-4 inline-flex items-center gap-2 bg-[#0A222F] px-4 py-2 rounded-xl border border-[#00ED64]/30 text-xs text-slate-200 font-mono">
-                <FiFileText className="text-[#00ED64] w-4 h-4" />
-                <span>{fileName}</span>
-                <span className="text-slate-500">({fileSize})</span>
-              </div>
-            )}
+            <div>
+              <h3 className="font-extrabold text-white text-base">
+                Uploader un Syllabus
+              </h3>
+              <p className="text-[11px] text-slate-400 font-mono">
+                Chiffrement & Filigrane automatique
+              </p>
+            </div>
           </div>
 
-          {/* Formulaire de configuration */}
-          <div className="bg-[#162C3D] border border-[#3D4F58]/50 rounded-3xl p-6 space-y-4 shadow-xl">
-            <h3 className="text-sm font-bold text-white border-b border-[#3D4F58]/40 pb-3">Informations du Module</h3>
-
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-medium block">Titre du cours / Syllabus</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full bg-[#0A222F] border border-[#3D4F58]/60 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#00ED64]"
-              />
+          {localError && (
+            <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs flex items-center gap-2">
+              <FiAlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{localError}</span>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs text-slate-300 font-medium block">Département / Faculté</label>
+          {isCapReached ? (
+            <div className="p-5 rounded-2xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs text-center space-y-2">
+              <FiAlertTriangle className="w-8 h-8 text-rose-400 mx-auto" />
+              <strong className="font-bold block text-white">
+                Upload temporairement désactivé
+              </strong>
+              <p>
+                Votre quota de 5 syllabus est plein. Veuillez supprimer un
+                document existant dans la liste ci-contre pour activer l'envoi.
+              </p>
+            </div>
+          ) : courses.length === 0 ? (
+            <div className="p-5 rounded-2xl bg-[#0A222F] border border-[#3D4F58]/40 text-slate-400 text-xs text-center space-y-2">
+              <FiHelpCircle className="w-8 h-8 text-slate-500 mx-auto" />
+              <strong className="font-bold block text-white">
+                Aucun cours disponible
+              </strong>
+              <p>
+                Vous devez d'abord créer une matière dans l'onglet "Mes Cours"
+                avant de pouvoir lui joindre un fichier PDF.
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Rattacher au cours :
+                </label>
+                <select
+                  required
+                  value={selectedCourseId}
+                  onChange={(e) => setSelectedCourseId(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-[#0A222F] border border-[#3D4F58] rounded-xl text-sm text-white focus:outline-none focus:border-[#00ED64] transition-colors cursor-pointer"
+                >
+                  <option value="" disabled>
+                    Sélectionnez une matière...
+                  </option>
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title} ({c.department})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Titre affiché du document :
+                </label>
                 <input
                   type="text"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  className="w-full bg-[#0A222F] border border-[#3D4F58]/60 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#00ED64]"
+                  required
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  placeholder="Ex: Syllabus Chapitres 1 à 4"
+                  className="w-full px-4 py-2.5 bg-[#0A222F] border border-[#3D4F58] rounded-xl text-sm text-white focus:outline-none focus:border-[#00ED64] transition-colors"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs text-slate-300 font-medium block">Prix d'accès semestre (FC)</label>
-                <div className="relative">
-                  <FiDollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#00ED64] w-4 h-4" />
-                  <input
-                    type="number"
-                    value={priceFc}
-                    onChange={(e) => setPriceFc(Number(e.target.value))}
-                    className="w-full bg-[#0A222F] border border-[#3D4F58]/60 rounded-xl pl-10 pr-4 py-3 text-xs font-mono text-[#00ED64] font-bold focus:outline-none focus:border-[#00ED64]"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Fichier PDF (10 Mo Max) :
+                </label>
+                <input
+                  id="syllabus-file-input"
+                  type="file"
+                  accept="application/pdf"
+                  required
+                  onChange={handleFileChange}
+                  className="w-full text-xs text-slate-400 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-[#00ED64] file:text-[#001E2B] hover:file:bg-[#00c753] file:cursor-pointer bg-[#0A222F] border border-[#3D4F58] rounded-xl cursor-pointer"
+                />
+                <p className="text-[10px] text-slate-500 font-mono mt-1.5 flex items-center gap-1">
+                  <FiShield className="text-[#00ED64]" />{" "}
+                  <span>Incrustation DRM filigrane nominative à la volée.</span>
+                </p>
               </div>
-            </div>
 
-            {/* Aperçu financier 70/30 */}
-            <div className="bg-[#0A222F]/60 p-4 rounded-2xl border border-[#3D4F58]/40 flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-400">Votre revenu net par étudiant (70%) :</span>
-              <span className="text-sm font-extrabold text-[#00ED64]">
-                {(priceFc * 0.70).toLocaleString()} FC
-              </span>
-            </div>
-
-            <button className="w-full bg-[#00ED64] hover:bg-[#00c753] text-[#001E2B] font-extrabold py-3.5 rounded-xl text-xs shadow-[0_4px_15px_rgba(0,237,100,0.2)] transition-all cursor-pointer">
-              Enregistrer & Mettre à jour le catalogue
-            </button>
-          </div>
+              <button
+                type="submit"
+                disabled={uploading || !file || !selectedCourseId}
+                className="w-full mt-2 bg-[#00ED64] hover:bg-[#00c753] disabled:opacity-50 text-[#001E2B] font-extrabold py-3 rounded-xl shadow-[0_4px_15px_rgba(0,237,100,0.2)] transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
+              >
+                {uploading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-[#001E2B] border-t-transparent rounded-full animate-spin" />
+                    <span>Chiffrement et envoi en cours...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiUploadCloud className="w-4 h-4" />
+                    <span>Uploader dans le Bucket Privé</span>
+                  </>
+                )}
+              </button>
+            </form>
+          )}
         </div>
 
-        {/* COLONNE DROITE (5 SPANS) : SIMULATEUR DRM EN DIRECT */}
-        <div className="lg:col-span-5 bg-[#162C3D] border border-[#3D4F58]/50 rounded-3xl p-6 space-y-4 shadow-xl sticky top-28">
-          <div className="flex items-center justify-between pb-3 border-b border-[#3D4F58]/40">
-            <div className="flex items-center gap-2">
-              <FiEye className="text-[#00ED64] w-4 h-4" />
-              <h3 className="text-sm font-bold text-white">Simulateur Anti-Piratage (DRM)</h3>
-            </div>
-            <span className="text-[10px] font-mono text-[#00ED64] bg-[#0A222F] px-2.5 py-1 rounded border border-[#00ED64]/30 font-bold">
-              15% Opacité
+        {/* HOSTED SYLLABI LISTING */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between border-b border-[#3D4F58]/40 pb-3">
+            <h3 className="font-extrabold text-white text-lg">
+              Documents actifs dans le cloud ({totalSyllabiCount})
+            </h3>
+            <span className="text-xs font-mono text-slate-400">
+              Supabase Storage • course-syllabi
             </span>
           </div>
 
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Voici exactement comment vos étudiants verront ce document sur leur téléphone. Le nom et le numéro Mobile Money de chaque acheteur sont gravés dynamiquement sur le flux HTML5.
-          </p>
-
-          {/* Canvas Preview Box */}
-          <div className="bg-[#0A222F] p-3 rounded-2xl border border-[#3D4F58]/40 flex justify-center overflow-hidden shadow-inner">
-            <canvas ref={canvasRef} className="max-w-full h-auto rounded border border-slate-300 shadow-md block" />
-          </div>
-
-          {/* Testeur de nom personnalisé */}
-          <div className="space-y-1 pt-2">
-            <span className="text-[10px] font-mono text-slate-400 uppercase block">Tester avec un autre profil étudiant :</span>
-            <div className="flex gap-2">
-              <input 
-                type="text" 
-                value={demoStudent.name} 
-                onChange={(e) => setDemoStudent({ ...demoStudent, name: e.target.value.toUpperCase() })}
-                className="flex-1 bg-[#0A222F] border border-[#3D4F58]/60 rounded-lg px-3 py-1.5 text-[11px] font-mono text-white focus:outline-none focus:border-[#00ED64]"
-                placeholder="NOM ETUDIANT"
-              />
-              <input 
-                type="text" 
-                value={demoStudent.phone} 
-                onChange={(e) => setDemoStudent({ ...demoStudent, phone: e.target.value })}
-                className="w-32 bg-[#0A222F] border border-[#3D4F58]/60 rounded-lg px-3 py-1.5 text-[11px] font-mono text-white focus:outline-none focus:border-[#00ED64]"
-                placeholder="TEL"
-              />
+          {totalSyllabiCount === 0 ? (
+            <div className="bg-[#162C3D]/40 border border-[#3D4F58]/40 p-12 rounded-3xl text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-[#0A222F] border border-[#3D4F58] flex items-center justify-center mx-auto text-slate-500">
+                <FiFileText className="w-6 h-6" />
+              </div>
+              <p className="text-slate-300 font-bold text-sm">
+                Aucun syllabus hébergé
+              </p>
+              <p className="text-slate-500 text-xs max-w-sm mx-auto">
+                Vos syllabus uploadés apparaîtront ici. Ils seront
+                automatiquement synchronisés avec le lecteur offline PWA de vos
+                étudiants inscrits.
+              </p>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-3">
+              {courses.map((course) =>
+                course.syllabi?.map((syl) => (
+                  <div
+                    key={syl.id}
+                    className="bg-[#162C3D]/80 border border-[#3D4F58]/60 hover:border-[#3D4F58] p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all shadow-md"
+                  >
+                    <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
+                      <div className="w-11 h-11 rounded-xl bg-[#00ED64]/10 border border-[#00ED64]/30 flex flex-col items-center justify-center text-[#00ED64] shrink-0 font-mono">
+                        <FiFileText className="w-4 h-4" />
+                        <span className="text-[9px] font-bold mt-0.5">PDF</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h5 className="font-bold text-white text-sm truncate">
+                            {syl.title}
+                          </h5>
+                          <span className="text-[10px] font-mono bg-[#0A222F] px-2 py-0.5 rounded text-slate-300 border border-[#3D4F58]/50">
+                            {syl.file_size_mb || "1.0"} Mo
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 truncate mt-0.5">
+                          Matière :{" "}
+                          <strong className="text-slate-300">
+                            {course.title}
+                          </strong>
+                        </p>
+                        <div className="flex items-center gap-2 text-[10px] font-mono text-[#00ED64] mt-1">
+                          <FiCheckCircle className="w-3 h-3 shrink-0" />
+                          <span>
+                            URL Signée 60s active • Protection Canvas DRM
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="w-full sm:w-auto flex items-center justify-end shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#3D4F58]/40">
+                      <button
+                        onClick={() =>
+                          onDeleteSyllabus(syl.id, syl.storage_file_path)
+                        }
+                        className="w-full sm:w-auto px-4 py-2 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 hover:border-rose-500/60 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2"
+                        title="Supprimer définitivement ce fichier"
+                      >
+                        <FiTrash2 className="w-3.5 h-3.5" />
+                        <span>Supprimer</span>
+                      </button>
+                    </div>
+                  </div>
+                )),
+              )}
+            </div>
+          )}
         </div>
-
       </div>
-
     </div>
   );
 }

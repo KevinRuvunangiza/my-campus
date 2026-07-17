@@ -19,14 +19,14 @@ import AuthScreen from "./components/screens/auth/AuthScreen";
 // =============================================================================
 import StudentLayout from "./components/screens/student/StudentLayout";
 import LecturerRoute from "./components/screens/lecturer/LecturerRoute";
+import VerificationPendingRoute from "./components/screens/lecturer/VerificationPendingRoute";
 
 export default function App() {
   return (
     <Routes>
-      
       {/* =======================================================================
           GATEKEEPER 1: GUEST-ONLY ROUTES (Public Visitors & Auth)
-          If a user is ALREADY logged in, GuestOnlyRoute automatically redirects 
+          If a user is ALREADY logged in, GuestOnlyRoute automatically redirects
           them straight to /student or /lecturer based on their profiles.role!
           ======================================================================= */}
       <Route element={<GuestOnlyRoute />}>
@@ -45,21 +45,28 @@ export default function App() {
 
       {/* =======================================================================
           GATEKEEPER 3: LECTURER DESKTOP PORTAL (Strict Role Check)
-          Requires userProfile.role === "lecturer". If an authenticated student 
-          tries to type /lecturer in their browser, ProtectedRoute blocks them 
+          Requires userProfile.role === "lecturer". If an authenticated student
+          tries to type /lecturer in their browser, ProtectedRoute blocks them
           and bounces them safely back to /student!
+
+          verification-pending is mounted UNDER this same guard (not public)
+          so an anonymous visitor can't view it, but it deliberately skips the
+          is_verified gate that LecturerRoute applies to everything else.
           ======================================================================= */}
       <Route element={<ProtectedRoute requireRole="lecturer" />}>
+        <Route
+          path="/lecturer/verification-pending"
+          element={<VerificationPendingRoute />}
+        />
         <Route path="/lecturer/*" element={<LecturerRoute />} />
       </Route>
 
       {/* =======================================================================
           FALLBACK: CATCH-ALL WILDCARD
-          Any typos or unknown URLs (e.g., /random-page) get cleanly redirected 
+          Any typos or unknown URLs (e.g., /random-page) get cleanly redirected
           back to the root Monolith storefront.
           ======================================================================= */}
       <Route path="*" element={<Navigate to="/" replace />} />
-
     </Routes>
   );
 }

@@ -22,17 +22,17 @@ export default function LecturerDashboard({
 }) {
   const [title, setTitle] = useState("");
   const [department, setDepartment] = useState("Sciences Informatiques");
-  const [priceFc, setPriceFc] = useState("3500");
+  const [priceUsd, setPriceUsd] = useState("1.25");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!title.trim()) return;
     setSubmitting(true);
-    const success = await onCreateCourse({ title, department, priceFc });
+    const success = await onCreateCourse({ title, department, priceUsd });
     if (success) {
       setTitle("");
-      setPriceFc("3500");
+      setPriceUsd("1.25");
     }
     setSubmitting(false);
   };
@@ -109,8 +109,7 @@ export default function LecturerDashboard({
             </div>
           </div>
           <div className="text-3xl font-extrabold text-[#00ED64] font-mono">
-            {financeMetrics?.netLecturerShareFc?.toLocaleString() || 0}{" "}
-            <span className="text-xs font-normal text-slate-300">FC</span>
+            $ {(financeMetrics?.netLecturerShareUsd || 0).toFixed(2)}{" "}
           </div>
           <p className="text-[11px] text-slate-300 mt-2 flex items-center gap-1">
             <span>
@@ -165,21 +164,20 @@ export default function LecturerDashboard({
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1">
-                Prix d'accès étudiant (Francs Congolais)
+                Prix d'accès étudiant (USD $)
               </label>
               <input
                 type="number"
                 required
                 min="0"
-                step="500"
-                value={priceFc}
-                onChange={(e) => setPriceFc(e.target.value)}
+                step="0.25"
+                value={priceUsd}
+                onChange={(e) => setPriceUsd(e.target.value)}
                 className="w-full px-4 py-2.5 bg-[#0A222F] border border-[#3D4F58] rounded-xl text-sm text-white focus:outline-none focus:border-[#00ED64] font-mono transition-colors"
               />
               <span className="text-[10px] text-slate-500 font-mono block mt-1">
-                💡 Vous encaissez 70% direct (
-                {Math.floor(Number(priceFc || 0) * 0.7).toLocaleString()} FC)
-                via Mobile Money.
+                💡 Vous encaissez 70% direct (${
+                (Number(priceUsd || 0) * 0.7).toFixed(2)}) via Mobile Money.
               </span>
             </div>
             <button
@@ -232,7 +230,7 @@ export default function LecturerDashboard({
                   <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2.5 flex-wrap">
                       <span className="font-mono text-xs font-bold text-[#00ED64] bg-[#00684A]/30 px-2.5 py-0.5 rounded-lg border border-[#00ED64]/20">
-                        {Number(course.price_fc).toLocaleString()} FC
+                        $ {Number(course.price_usd).toFixed(2)}
                       </span>
                       <span
                         className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-md font-bold flex items-center gap-1 ${course.is_published ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-amber-500/20 text-amber-300 border border-amber-500/30"}`}

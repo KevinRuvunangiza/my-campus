@@ -29,7 +29,7 @@ export async function getCourses({ lecturerId, onlyPublished } = {}) {
       title,
       department,
       university,
-      price_fc,
+      price_usd,
       is_published,
       lecturer_id,
       lecturer:profiles!courses_lecturer_id_fkey (

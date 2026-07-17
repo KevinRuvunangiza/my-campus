@@ -122,7 +122,7 @@ export default function Explore({
                       </span>
                     ) : (
                       <span className="bg-[#00ED64] text-[#001E2B] font-extrabold text-xs px-4 py-1.5 rounded-full shadow-sm group-hover:scale-105 transition-transform">
-                        {course.price_fc.toLocaleString()} FC
+                        $ {Number(course.price_usd).toFixed(2)}
                       </span>
                     )}
                   </div>

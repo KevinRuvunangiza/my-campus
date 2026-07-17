@@ -1,246 +1,353 @@
 // src/components/screens/lecturer/Financials.jsx
-import React, { useState } from "react";
-import { m } from "framer-motion";
+import { useState, useEffect } from "react";
 import {
   FiDollarSign,
-  FiCheckCircle,
   FiPhoneCall,
-  FiSend,
+  FiTrendingUp,
+  FiCreditCard,
+  FiCheckCircle,
+  FiAlertTriangle,
+  FiRefreshCw,
 } from "react-icons/fi";
 import * as lecturerService from "../../../services/lecturerService";
 
-// Future feature: Replace with actual fetch from lecturer_payouts table.
-// Kept for visual layout integrity as per the original design.
-const PAYOUT_HISTORY = [];
+export default function LecturerFinancials({ user }) {
+  const [metrics, setMetrics] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [exchangeRate, setExchangeRate] = useState(2850);
+  const [loadingRate, setLoadingRate] = useState(true);
 
-export default function Financials({ user, financeMetrics }) {
-  const [selectedProvider, setSelectedProvider] = useState("m_pesa");
-  const [withdrawPhone, setWithdrawPhone] = useState(user?.phone_number || "");
-  const [withdrawAmount, setWithdrawAmount] = useState("");
+  // Cashout Form State
+  const [cashoutAmount, setCashoutAmount] = useState("");
+  const [cashoutPhone, setCashoutPhone] = useState(user?.phone_number || "");
+  const [cashoutProvider, setCashoutProvider] = useState("MPESA");
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false);
+  const [statusMsg, setStatusMsg] = useState({ type: null, text: "" });
 
-  const [isRequesting, setIsRequesting] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  useEffect(() => {
+    let isMounted = true;
 
-  const totalGrossFc = financeMetrics?.grossRevenueFc || 0;
-  const platformFeeFc = totalGrossFc * 0.3;
-  const netWithdrawableFc = financeMetrics?.netLecturerShareFc || 0;
+    async function loadFinancialData() {
+      try {
+        const [dashboardMetrics, forexRes] = await Promise.all([
+          lecturerService.getFinancialDashboard(user.id),
+          fetch("https://open.er-api.com/v6/latest/USD")
+            .then((res) => res.json())
+            .catch(() => ({ rates: { CDF: 2850 } })),
+        ]);
 
-  const handlePayoutRequest = async (e) => {
+        if (isMounted) {
+          setMetrics(dashboardMetrics);
+          setExchangeRate(forexRes?.rates?.CDF || 2850);
+          setLoadingRate(false);
+        }
+      } catch (err) {
+        console.error("Échec du chargement des rapports financiers:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadFinancialData();
+    return () => {
+      isMounted = false;
+    };
+  }, [user.id]);
+
+  const handleCashoutSubmit = async (e) => {
     e.preventDefault();
-    setErrorMsg("");
+    setStatusMsg({ type: null, text: "" });
 
-    if (Number(withdrawAmount) > netWithdrawableFc) {
-      return setErrorMsg(
-        "Fonds insuffisants. Vous ne pouvez pas retirer plus que votre solde net.",
-      );
-    }
-    if (Number(withdrawAmount) < 1000) {
-      return setErrorMsg("Le montant minimum de retrait est de 1000 FC.");
+    const amt = parseFloat(cashoutAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setStatusMsg({
+        type: "error",
+        text: "Veuillez entrer un montant valide supérieur à 0.",
+      });
+      return;
     }
 
-    setIsRequesting(true);
+    if (amt > (metrics?.netLecturerShareUsd || 0)) {
+      setStatusMsg({
+        type: "error",
+        text: "Solde insuffisant pour demander ce montant.",
+      });
+      return;
+    }
+
+    if (!cashoutPhone || cashoutPhone.length < 9) {
+      setStatusMsg({ type: "error", text: "Numéro Mobile Money invalide." });
+      return;
+    }
+
+    setPayoutSubmitting(true);
     try {
       await lecturerService.requestMobileMoneyCashout({
         lecturerId: user.id,
-        amountFc: withdrawAmount,
-        provider: selectedProvider,
-        destinationPhone: withdrawPhone,
+        amountUsd: amt,
+        provider: cashoutProvider,
+        destinationPhone: cashoutPhone,
       });
-      setShowSuccess(true);
-      setWithdrawAmount("");
-      setTimeout(() => setShowSuccess(false), 5000);
+
+      setStatusMsg({
+        type: "success",
+        text: `Demande soumise ! Notre équipe validera et versera le montant de ${Math.ceil(amt * exchangeRate).toLocaleString()} FC sur votre compte sous 24 heures.`,
+      });
+
+      // Deduct locally to update the user's interface instantly
+      setMetrics((prev) => ({
+        ...prev,
+        netLecturerShareUsd: prev.netLecturerShareUsd - amt,
+      }));
+      setCashoutAmount("");
     } catch (err) {
-      setErrorMsg(err.message || "Erreur lors de la demande de virement.");
+      setStatusMsg({
+        type: "error",
+        text: "Une erreur est survenue lors du cashout : " + err.message,
+      });
     } finally {
-      setIsRequesting(false);
+      setPayoutSubmitting(false);
     }
   };
+
+  // Compile all transaction items across courses
+  const transactions = [];
+  metrics?.courses?.forEach((course) => {
+    course.purchases?.forEach((p) => {
+      transactions.push({
+        id: p.id,
+        courseTitle: course.title,
+        status: p.status,
+        purchased_at: p.purchased_at,
+        amountUsd: p.amount_usd,
+        shareUsd: p.lecturer_share_usd,
+      });
+    });
+  });
+  // Sort transaction history descending by date
+  transactions.sort(
+    (a, b) => new Date(b.purchased_at) - new Date(a.purchased_at),
+  );
 
   return (
     <div className="space-y-8 font-sans">
       <div>
         <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
-          <FiDollarSign className="text-[#00ED64]" /> Grand Livre Financier &
-          Retraits
+          <FiTrendingUp className="text-[#00ED64]" /> Portefeuille Financier
         </h2>
         <p className="text-xs text-slate-400 mt-0.5">
-          La commission 70% distributeur / 30% plateforme est calculée et
-          verrouillée automatiquement par Supabase à chaque achat.
+          Gérez vos gains, taux de change, et retraits Mobile Money en toute
+          transparence.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-[#162C3D]/80 border border-[#3D4F58]/50 rounded-3xl p-6 shadow-xl space-y-2">
-          <span className="text-xs font-mono text-slate-400 uppercase font-bold block">
-            Revenu Brut Global
-          </span>
-          <h3 className="text-2xl font-bold font-mono text-white">
-            {totalGrossFc.toLocaleString()} FC
-          </h3>
-          <p className="text-[11px] text-slate-400">
-            Total payé par les étudiants via FlexPay
+      {loading ? (
+        <div className="py-20 flex flex-col items-center justify-center space-y-3">
+          <div className="w-10 h-10 border-4 border-[#162C3D] border-t-[#00ED64] rounded-full animate-spin" />
+          <p className="text-xs text-slate-400 font-mono">
+            Génération des rapports comptables...
           </p>
         </div>
-        <div className="bg-[#162C3D]/80 border border-[#3D4F58]/50 rounded-3xl p-6 shadow-xl space-y-2">
-          <span className="text-xs font-mono text-rose-400 uppercase font-bold block">
-            Commission Plateforme (30%)
-          </span>
-          <h3 className="text-2xl font-bold font-mono text-rose-400">
-            -{platformFeeFc.toLocaleString()} FC
-          </h3>
-          <p className="text-[11px] text-slate-400">
-            Frais serveurs CDN, base de données et maintenance
-          </p>
-        </div>
-        <div className="bg-gradient-to-br from-[#162C3D] to-[#0D2633] border border-[#00ED64]/50 rounded-3xl p-6 shadow-xl space-y-2 relative overflow-hidden">
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-[#00ED64]/10 rounded-full blur-2xl" />
-          <span className="text-xs font-mono text-[#00ED64] uppercase font-extrabold block">
-            Solde Net Retirable (70%)
-          </span>
-          <h3 className="text-3xl font-extrabold font-mono text-[#00ED64]">
-            {netWithdrawableFc.toLocaleString()} FC
-          </h3>
-          <p className="text-[11px] text-emerald-200/80">
-            Disponible immédiatement en Mobile Money
-          </p>
-        </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Main Account Balances */}
+          <div className="lg:col-span-4 space-y-5">
+            <div className="bg-[#162C3D]/80 border border-[#3D4F58]/60 p-6 rounded-3xl shadow-xl space-y-4">
+              <span className="text-[10px] font-mono text-[#00ED64] uppercase font-bold block">
+                Solde Disponible
+              </span>
+              <div className="space-y-1">
+                <span className="text-3xl font-extrabold text-white font-mono">
+                  $ {(metrics?.netLecturerShareUsd || 0).toFixed(2)}
+                </span>
+                {loadingRate ? (
+                  <span className="text-xs text-slate-500 flex items-center gap-1 animate-pulse">
+                    <FiRefreshCw className="w-3.5 h-3.5 animate-spin" /> Calcul
+                    du cours de change...
+                  </span>
+                ) : (
+                  <span className="text-sm font-mono text-slate-300 block font-bold">
+                    ~{" "}
+                    {Math.ceil(
+                      (metrics?.netLecturerShareUsd || 0) * exchangeRate,
+                    ).toLocaleString()}{" "}
+                    FC
+                  </span>
+                )}
+              </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        <div className="lg:col-span-5 bg-[#162C3D]/80 border border-[#3D4F58]/50 rounded-3xl p-6 space-y-5 shadow-xl">
-          <div className="flex justify-between items-center pb-3 border-b border-[#3D4F58]/40">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <FiSend className="text-[#00ED64]" /> Demander un Retrait
-            </h3>
-            <span className="text-[10px] font-mono text-[#00ED64] bg-[#0A222F] px-2 py-0.5 rounded border border-[#00ED64]/30 font-bold">
-              Sans frais
-            </span>
-          </div>
+              {!loadingRate && (
+                <div className="text-[10px] font-mono text-emerald-400/80 bg-[#0A222F]/60 p-2.5 rounded-xl border border-[#3D4F58]/30">
+                  💱 Forex en direct : 1$ ={" "}
+                  {Math.round(exchangeRate).toLocaleString()} FC
+                </div>
+              )}
+            </div>
 
-          <form onSubmit={handlePayoutRequest} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-medium block">
-                1. Choisir l'opérateur de réception
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: "m_pesa", name: "M-Pesa", color: "bg-emerald-600" },
-                  { id: "airtel_money", name: "Airtel", color: "bg-red-600" },
-                  {
-                    id: "orange_money",
-                    name: "Orange",
-                    color: "bg-orange-500",
-                  },
-                ].map((p) => (
+            {/* Cashout Request Form */}
+            <div className="bg-[#162C3D]/80 border border-[#3D4F58]/60 p-6 rounded-3xl shadow-xl space-y-4">
+              <div className="flex items-center gap-2.5 border-b border-[#3D4F58]/40 pb-4">
+                <div className="w-8 h-8 rounded-lg bg-[#00ED64]/10 text-[#00ED64] flex items-center justify-center font-bold">
+                  <FiCreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-sm">
+                    Demander un transfert
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-mono">
+                    Paiement Mobile Money instantané
+                  </p>
+                </div>
+              </div>
+
+              {statusMsg.text && (
+                <div
+                  className={`p-3.5 rounded-xl text-xs flex items-start gap-2 font-semibold ${
+                    statusMsg.type === "success"
+                      ? "bg-emerald-950/80 text-emerald-200 border border-[#00ED64]/30"
+                      : "bg-rose-950/80 text-rose-200 border border-rose-500/30"
+                  }`}
+                >
+                  {statusMsg.type === "success" ? (
+                    <FiCheckCircle className="w-4 h-4 shrink-0 text-[#00ED64]" />
+                  ) : (
+                    <FiAlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                  )}
+                  <span>{statusMsg.text}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleCashoutSubmit} className="space-y-4 pt-1">
+                <div className="grid grid-cols-2 gap-2">
                   <button
-                    key={p.id}
                     type="button"
-                    onClick={() => setSelectedProvider(p.id)}
-                    className={`p-3 rounded-2xl border text-center transition-all cursor-pointer ${
-                      selectedProvider === p.id
-                        ? "bg-[#1C364B] border-[#00ED64] shadow-[0_0_15px_rgba(0,237,100,0.15)] font-bold text-white"
-                        : "bg-[#0A222F]/60 border-[#3D4F58]/40 text-slate-400 hover:text-white"
+                    onClick={() => setCashoutProvider("MPESA")}
+                    className={`py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      cashoutProvider === "MPESA"
+                        ? "bg-[#1C364B] border-[#00ED64] text-white"
+                        : "bg-[#0A222F]/60 border-[#3D4F58]/30 text-slate-400"
                     }`}
                   >
-                    <span
-                      className={`w-2 h-2 rounded-full inline-block mr-1.5 ${p.color}`}
-                    />
-                    <span className="text-xs">{p.name}</span>
+                    M-Pesa
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setCashoutProvider("ORANGE")}
+                    className={`py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      cashoutProvider === "ORANGE"
+                        ? "bg-[#1C364B] border-[#00ED64] text-white"
+                        : "bg-[#0A222F]/60 border-[#3D4F58]/30 text-slate-400"
+                    }`}
+                  >
+                    Orange Money
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Montant à retirer (USD $)
+                  </label>
+                  <div className="relative">
+                    <FiDollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      step="0.10"
+                      value={cashoutAmount}
+                      onChange={(e) => setCashoutAmount(e.target.value)}
+                      placeholder="Ex: 50.00"
+                      className="w-full pl-9 pr-3 py-2.5 bg-[#0A222F] border border-[#3D4F58] rounded-xl text-sm font-mono text-white focus:outline-none focus:border-[#00ED64]"
+                    />
+                  </div>
+                  {cashoutAmount && !isNaN(parseFloat(cashoutAmount)) && (
+                    <span className="text-[10px] text-slate-500 font-mono block mt-1">
+                      Calcul de réception: ~{" "}
+                      {Math.ceil(
+                        parseFloat(cashoutAmount) * exchangeRate,
+                      ).toLocaleString()}{" "}
+                      FC
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    Numéro Mobile Money cible
+                  </label>
+                  <div className="relative">
+                    <FiPhoneCall className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <input
+                      type="tel"
+                      required
+                      value={cashoutPhone}
+                      onChange={(e) => setCashoutPhone(e.target.value)}
+                      placeholder="Ex: 0841234567"
+                      className="w-full pl-9 pr-3 py-2.5 bg-[#0A222F] border border-[#3D4F58] rounded-xl text-sm font-mono text-white focus:outline-none focus:border-[#00ED64]"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={payoutSubmitting}
+                  className="w-full bg-[#00ED64] hover:bg-[#00c753] disabled:opacity-50 text-[#001E2B] font-extrabold py-3.5 rounded-xl shadow-lg transition-colors cursor-pointer text-xs"
+                >
+                  {payoutSubmitting ? (
+                    <div className="w-5 h-5 border-2 border-[#001E2B] border-t-transparent rounded-full animate-spin mx-auto" />
+                  ) : (
+                    "Lancer le retrait"
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Detailed Transaction History */}
+          <div className="lg:col-span-8 bg-[#162C3D]/80 border border-[#3D4F58]/60 p-6 rounded-3xl shadow-xl space-y-4">
+            <h3 className="font-extrabold text-white text-sm pb-3 border-b border-[#3D4F58]/40">
+              Historique des ventes
+            </h3>
+
+            {transactions.length === 0 ? (
+              <div className="py-20 text-center text-slate-500 text-xs">
+                Aucune transaction enregistrée pour vos cours pour le moment.
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                {transactions.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="bg-[#0A222F]/60 border border-[#3D4F58]/30 p-4 rounded-2xl flex justify-between items-center text-xs"
+                  >
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-white max-w-[250px] truncate">
+                        {tx.courseTitle}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 font-mono">
+                        {new Date(tx.purchased_at).toLocaleDateString()} •{" "}
+                        {new Date(tx.purchased_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+
+                    <div className="text-right font-mono">
+                      <span className="font-bold text-[#00ED64] block">
+                        +$ {tx.shareUsd.toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        vendu $ {tx.amountUsd.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-medium block">
-                2. Numéro de téléphone bénéficiaire
-              </label>
-              <div className="relative">
-                <FiPhoneCall className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <input
-                  type="tel"
-                  value={withdrawPhone}
-                  onChange={(e) => setWithdrawPhone(e.target.value)}
-                  className="w-full bg-[#0A222F] border border-[#3D4F58]/60 rounded-xl pl-10 pr-4 py-3 text-xs font-mono text-white focus:outline-none focus:border-[#00ED64]"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-medium block">
-                3. Montant à retirer (FC)
-              </label>
-              <input
-                type="number"
-                max={netWithdrawableFc}
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-                placeholder={`Max: ${netWithdrawableFc}`}
-                className="w-full bg-[#0A222F] border border-[#3D4F58]/60 rounded-xl px-4 py-3 text-sm font-mono font-bold text-[#00ED64] focus:outline-none focus:border-[#00ED64]"
-                required
-              />
-            </div>
-
-            {errorMsg && (
-              <p className="text-xs text-rose-400 font-bold">{errorMsg}</p>
             )}
-
-            <button
-              type="submit"
-              disabled={isRequesting || netWithdrawableFc <= 0}
-              className="w-full bg-[#00ED64] hover:bg-[#00c753] disabled:opacity-50 text-[#001E2B] font-extrabold py-4 rounded-2xl shadow-[0_4px_20px_rgba(0,237,100,0.25)] transition-all flex items-center justify-center gap-2 text-xs cursor-pointer mt-2"
-            >
-              {isRequesting ? (
-                <div className="w-4 h-4 border-2 border-[#001E2B] border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <FiSend className="w-4 h-4" />
-                  <span>
-                    Transférer {Number(withdrawAmount || 0).toLocaleString()} FC
-                    maintenant
-                  </span>
-                </>
-              )}
-            </button>
-          </form>
-
-          {showSuccess && (
-            <m.div
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-[#00684A]/40 border border-[#00ED64]/50 rounded-xl p-3 text-xs text-emerald-200 flex items-center gap-2"
-            >
-              <FiCheckCircle className="text-[#00ED64] w-4 h-4 shrink-0" />
-              <span>
-                Demande envoyée ! Le transfert Mobile Money s'effectuera d'ici 5
-                à 10 minutes.
-              </span>
-            </m.div>
-          )}
-        </div>
-
-        <div className="lg:col-span-7 bg-[#162C3D]/80 border border-[#3D4F58]/50 rounded-3xl p-6 space-y-4 shadow-xl">
-          <div className="flex justify-between items-center pb-3 border-b border-[#3D4F58]/40">
-            <h3 className="text-sm font-bold text-white">
-              Historique des Virements Effectués
-            </h3>
-            <span className="text-xs font-mono text-slate-400">
-              {PAYOUT_HISTORY.length} opérations
-            </span>
           </div>
-          {PAYOUT_HISTORY.length === 0 ? (
-            <p className="text-xs text-slate-500 py-8 text-center">
-              Aucun retrait effectué pour le moment.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              {/* Original Table mapping goes here when history is fetched */}
-            </div>
-          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

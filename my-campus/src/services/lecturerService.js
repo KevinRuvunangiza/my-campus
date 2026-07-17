@@ -10,7 +10,7 @@ export async function getLecturerCourses(lecturerId) {
       *,
       syllabi(*),
       chapters(id, title, questions(id)),
-      purchases(id, amount_fc, lecturer_share_fc, status)
+      purchases(id, amount_usd, lecturer_share_usd, status)
     `,
     )
     .eq("lecturer_id", lecturerId)
@@ -20,7 +20,7 @@ export async function getLecturerCourses(lecturerId) {
   return data;
 }
 
-export async function createCourse({ lecturerId, title, department, priceFc }) {
+export async function createCourse({ lecturerId, title, department, priceUsd }) {
   const { data, error } = await supabase
     .from("courses")
     .insert([
@@ -29,7 +29,7 @@ export async function createCourse({ lecturerId, title, department, priceFc }) {
         title,
         department: department || "Tronc Commun",
         university: "USCITECH",
-        price_fc: parseInt(priceFc) || 3500,
+        price_usd: Math.round(Number(priceUsd)) || 1, // integer column
         is_published: false,
       },
     ])
@@ -40,7 +40,7 @@ export async function createCourse({ lecturerId, title, department, priceFc }) {
   return data;
 }
 
-// 💥 NEW: Delete a full course
+// 💥 Delete a full course (cascades to chapters, questions, syllabi via DB policy)
 export async function deleteCourse(courseId) {
   const { error } = await supabase.from("courses").delete().eq("id", courseId);
 
@@ -164,42 +164,54 @@ export async function getFinancialDashboard(lecturerId) {
   const { data: courses, error } = await supabase
     .from("courses")
     .select(
-      `id, title, price_fc, purchases(id, amount_fc, lecturer_share_fc, status, purchased_at)`,
+      `id, title, price_usd, purchases(id, amount_usd, lecturer_share_usd, status, purchased_at)`,
     )
     .eq("lecturer_id", lecturerId);
 
   if (error) throw error;
 
   let totalSalesCount = 0;
-  let grossRevenueFc = 0;
-  let netLecturerShareFc = 0;
+  let grossRevenueUsd = 0;
+  let netLecturerShareUsd = 0;
 
   courses.forEach((course) => {
     course.purchases?.forEach((p) => {
       if (p.status === "completed") {
         totalSalesCount += 1;
-        grossRevenueFc += p.amount_fc;
-        netLecturerShareFc += Number(p.lecturer_share_fc);
+        grossRevenueUsd += Number(p.amount_usd);
+        netLecturerShareUsd += Number(p.lecturer_share_usd);
       }
     });
   });
 
-  return { totalSalesCount, grossRevenueFc, netLecturerShareFc, courses };
+  return {
+    totalSalesCount,
+    grossRevenueUsd: Number(grossRevenueUsd.toFixed(2)),
+    netLecturerShareUsd: Number(netLecturerShareUsd.toFixed(2)),
+    courses,
+  };
 }
 
 export async function requestMobileMoneyCashout({
   lecturerId,
-  amountFc,
+  amountUsd,
   provider,
   destinationPhone,
 }) {
+  let dbProvider = "vodacom_mpesa";
+  if (provider === "ORANGE" || provider === "orange_money" || provider === "ORANGE_MONEY") {
+    dbProvider = "orange_money";
+  } else if (provider === "AIRTEL" || provider === "airtel_money" || provider === "AIRTEL_MONEY") {
+    dbProvider = "airtel_money";
+  }
+
   const { data, error } = await supabase
     .from("lecturer_payouts")
     .insert([
       {
         lecturer_id: lecturerId,
-        amount_fc: parseInt(amountFc),
-        provider: provider,
+        amount_usd: Math.round(Number(amountUsd)), // integer column
+        provider: dbProvider,
         destination_phone: destinationPhone,
         status: "requested",
       },

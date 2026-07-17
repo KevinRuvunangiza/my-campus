@@ -158,7 +158,7 @@ export default function Profile({ user, activeTab, setActiveTab, onLogout }) {
                   </div>
                   <div className="text-right font-mono">
                     <span className="font-bold text-[#00ED64] block">
-                      {tx.amount_fc.toLocaleString()} FC
+                      $ {Number(tx.amount_usd).toFixed(2)}
                     </span>
                   </div>
                 </div>

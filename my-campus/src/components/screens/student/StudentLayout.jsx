@@ -53,16 +53,28 @@ function ArenaRoute() {
 }
 
 // 💥 GESTIONNAIRE D'ONGLETS INTELLIGENT
+// Maps URL segment → canonical BottomNav tab ID
+// Segments:  ""         → "library"  (home / dashboard)
+//            "explore"  → "explorer" (market catalogue)
+//            "profile"  → "profile"
 function useActiveTab() {
   const location = useLocation();
   const navigate = useNavigate();
   const segment = location.pathname.split("/")[2];
-  const activeTab = ["explore", "progress", "profile"].includes(segment)
-    ? segment
-    : "home";
+
+  const segmentToTab = {
+    explore: "explorer",
+    profile: "profile",
+  };
+  const activeTab = segmentToTab[segment] ?? "library";
 
   const setActiveTab = (tab) => {
-    navigate(tab === "home" ? "/student" : `/student/${tab}`);
+    const tabToSegment = {
+      library: "/student",
+      explorer: "/student/explore",
+      profile: "/student/profile",
+    };
+    navigate(tabToSegment[tab] ?? "/student");
   };
 
   return [activeTab, setActiveTab];
@@ -121,8 +133,8 @@ export default function StudentLayout() {
                     user={userProfile}
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
-                    onOpenReader={handleCourseSelect}
-                    onOpenArena={openArena}
+                    onOpenSyllabus={handleCourseSelect}
+                    onOpenQuiz={openArena}
                   />
                 }
               />
@@ -169,8 +181,8 @@ export default function StudentLayout() {
         <AnimatePresence>
           {selectedCourseForPaywall && (
             <PaymentModal
-              course={selectedCourseForPaywall}
-              user={userProfile}
+              courseId={selectedCourseForPaywall.id}
+              priceUsd={selectedCourseForPaywall.price_usd}
               onClose={() => setSelectedCourseForPaywall(null)}
               onSuccess={handlePaymentSuccess}
             />

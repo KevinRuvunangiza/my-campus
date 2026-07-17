@@ -1,3 +1,4 @@
+// src/components/layout/lecturer/Sidebar.jsx
 import { m } from "framer-motion";
 import {
   FiGrid,
@@ -8,12 +9,11 @@ import {
   FiChevronLeft,
   FiChevronRight,
   FiShield,
-  FiExternalLink,
-} from "react-icons/fi"; // Added FiUsers
+} from "react-icons/fi";
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "Tableau de Bord", icon: FiGrid },
-  { id: "students", label: "Suivi des Étudiants", icon: FiUsers }, 
+  { id: "students", label: "Suivi des Étudiants", icon: FiUsers },
   { id: "syllabus", label: "Mes Syllabus & TP", icon: FiBook },
   { id: "qcm", label: "Banque de QCM", icon: FiCheckSquare },
   { id: "financials", label: "Revenus & Retraits", icon: FiDollarSign },
@@ -24,7 +24,6 @@ export default function Sidebar({
   setActiveTab,
   isCollapsed,
   setIsCollapsed,
-  onSwitchToStudent,
 }) {
   return (
     <m.aside
@@ -109,17 +108,8 @@ export default function Sidebar({
         </nav>
       </div>
 
-      {/* PIED DE SIDEBAR : RETOUR VUE ÉTUDIANT */}
-      <div className="pt-4 border-t border-[#3D4F58]/30">
-        <button
-          onClick={onSwitchToStudent}
-          title={isCollapsed ? "Voir l'application étudiant" : ""}
-          className="w-full flex items-center justify-center gap-3 p-3 rounded-2xl bg-[#162C3D]/60 hover:bg-[#1C364B] text-slate-300 hover:text-[#00ED64] border border-[#3D4F58]/40 transition-all text-xs font-semibold cursor-pointer"
-        >
-          <FiExternalLink className="w-4 h-4 shrink-0" />
-          {!isCollapsed && <span>Aperçu PWA Étudiant</span>}
-        </button>
-      </div>
+      {/* PIED DE SIDEBAR — intentionnellement vide (pas de switcher de rôle) */}
+      <div className="pt-4 border-t border-[#3D4F58]/30" />
     </m.aside>
   );
 }

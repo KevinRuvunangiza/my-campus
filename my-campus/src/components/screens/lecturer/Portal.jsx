@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { LazyMotion, domAnimation, AnimatePresence, m } from "framer-motion";
 import {
   FiCheckCircle,
-  FiAlertTriangle,
+  FiSliders,
   FiRefreshCw,
   FiAlertCircle,
 } from "react-icons/fi";
@@ -20,7 +20,7 @@ import StudentAnalytics from "./StudentAnalytics";
 import QcmBuilder from "./QcmBuilder";
 import Financials from "./Financials";
 
-export default function LecturerPortal({ user, onSwitchToStudent }) {
+export default function LecturerPortal({ user }) {
   // Navigation & Layout States
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -32,8 +32,8 @@ export default function LecturerPortal({ user, onSwitchToStudent }) {
   const [successMsg, setSuccessMsg] = useState(null);
   const [financeMetrics, setFinanceMetrics] = useState({
     totalSalesCount: 0,
-    grossRevenueFc: 0,
-    netLecturerShareFc: 0,
+    grossRevenueUsd: 0,
+    netLecturerShareUsd: 0,
   });
 
   // Load live data from Supabase
@@ -72,14 +72,14 @@ export default function LecturerPortal({ user, onSwitchToStudent }) {
   const isVerified = user?.is_verified === true;
 
   // Action Handlers
-  const handleCreateCourse = async ({ title, department, priceFc }) => {
+  const handleCreateCourse = async ({ title, department, priceUsd }) => {
     setError(null);
     try {
       const newCourse = await lecturerService.createCourse({
         lecturerId: user.id,
         title,
         department,
-        priceFc,
+        priceUsd,
       });
       setCourses([newCourse, ...courses]);
       setSuccessMsg(`✅ Cours "${newCourse.title}" créé en mode brouillon !`);
@@ -152,7 +152,6 @@ export default function LecturerPortal({ user, onSwitchToStudent }) {
           setActiveTab={setActiveTab}
           isCollapsed={isCollapsed}
           setIsCollapsed={setIsCollapsed}
-          onSwitchToStudent={onSwitchToStudent}
         />
 
         {/* MAIN CONTENT AREA */}
@@ -169,20 +168,57 @@ export default function LecturerPortal({ user, onSwitchToStudent }) {
           />
 
           <main className="flex-1 overflow-y-auto p-6 md:p-8 max-w-7xl w-full mx-auto">
-            {/* SANDBOX / UNVERIFIED NOTICE */}
+            {/* ── STANDBY BANNER — affiché tant que is_verified === false ── */}
             {!isVerified && (
-              <div className="mb-6 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between text-xs text-amber-200">
-                <div className="flex items-center gap-3">
-                  <FiAlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-                  <div>
-                    <strong className="font-bold text-white block mb-0.5">
-                      Mode Brouillon (Sandbox) Actif
-                    </strong>
-                    <span>
-                      Vous pouvez structurer vos cours et uploader vos TP, mais
-                      la publication sur le Market nécessite la validation de
-                      votre profil par l'équipe Monolith.
-                    </span>
+              <div className="mb-8 bg-gradient-to-r from-amber-950/60 to-[#162C3D]/80 border-2 border-amber-500/50 rounded-3xl p-6 shadow-[0_0_40px_rgba(245,158,11,0.08)]">
+                <div className="flex items-start gap-4">
+                  {/* Icon cluster */}
+                  <div className="relative shrink-0 mt-0.5">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center">
+                      <FiSliders className="w-6 h-6 text-amber-400" />
+                    </div>
+                    <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-amber-500/30 border border-amber-400/60 flex items-center justify-center">
+                      <FiAlertCircle className="w-3 h-3 text-amber-300" />
+                    </div>
+                  </div>
+
+                  {/* Text content */}
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-400 bg-amber-500/15 px-2.5 py-0.5 rounded-md border border-amber-500/30">
+                        Compte en Veille
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-500">
+                        En attente de vérification facultaire
+                      </span>
+                    </div>
+                    <h2 className="text-base font-extrabold text-white leading-snug">
+                      Mode Brouillon Actif — Publication désactivée
+                    </h2>
+                    <p className="text-xs text-amber-200/80 leading-relaxed">
+                      Votre dossier d'accréditation est en cours d'examen par
+                      l'équipe USCITECH. Jusqu'à validation de vos titres
+                      académiques, la publication de vos cours sur le marché
+                      étudiant en direct est <strong className="text-amber-300">temporairement suspendue</strong>.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                        Création de cours (brouillon)
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                        Upload de syllabus & TP
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                        Construction de la banque QCM
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-rose-400/80 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
+                        Publication sur le Market (bloquée)
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

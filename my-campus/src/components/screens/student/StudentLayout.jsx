@@ -18,21 +18,61 @@ import PaymentModal from "./PaymentModal";
 import SyllabusReader from "./SyllabusReader";
 import McqArena from "./McqArena";
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#0A222F] text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+          <div className="max-w-md bg-[#162C3D] border border-[#3D4F58]/50 rounded-3xl p-8 space-y-4 shadow-xl">
+            <h2 className="text-sm font-bold text-rose-400">Une erreur est survenue</h2>
+            <p className="text-xs text-slate-300">
+              {this.state.error?.message || "Erreur indéterminée"}
+            </p>
+            <pre className="text-[10px] text-slate-400 bg-[#071721] p-3 rounded-lg overflow-auto max-h-40 text-left font-mono">
+              {this.state.error?.stack}
+            </pre>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-6 py-2.5 bg-[#00ED64] text-[#001E2B] font-bold rounded-xl cursor-pointer"
+            >
+              Recharger l'application
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // 💥 PROTECTION DES SOUS-ROUTES
 function ReaderRoute() {
   const { state } = useLocation();
   const { userProfile } = useAuth();
+  const navigate = useNavigate();
   const course = state?.course;
 
   if (!course) return <Navigate to="/student" replace />;
 
   return (
-    <SyllabusReader
-      course={course}
-      studentName={userProfile?.full_name || "Étudiant USCITECH"}
-      studentPhone={userProfile?.phone_number || "084 000 0000"}
-      onBack={() => window.history.back()}
-    />
+    <ErrorBoundary>
+      <SyllabusReader
+        course={course}
+        studentName={userProfile?.full_name || "Étudiant USCITECH"}
+        studentPhone={userProfile?.phone_number || "084 000 0000"}
+        onBack={() => navigate("/student")}
+      />
+    </ErrorBoundary>
   );
 }
 
@@ -64,6 +104,7 @@ function useActiveTab() {
 
   const segmentToTab = {
     explore: "explorer",
+    progress: "stats",
     profile: "profile",
   };
   const activeTab = segmentToTab[segment] ?? "library";
@@ -72,6 +113,7 @@ function useActiveTab() {
     const tabToSegment = {
       library: "/student",
       explorer: "/student/explore",
+      stats: "/student/progress",
       profile: "/student/profile",
     };
     navigate(tabToSegment[tab] ?? "/student");
@@ -103,9 +145,14 @@ export default function StudentLayout() {
     }
   };
 
-  const handlePaymentSuccess = (courseId) => {
+  const handlePaymentSuccess = () => {
+    // Close the payment modal and send the student to their dashboard
+    // where the newly purchased course will appear.
     setSelectedCourseForPaywall(null);
     navigate("/student/progress", { replace: true });
+    // Force a full page reload so getStudentDashboard() re-fetches
+    // and the purchased course shows as unlocked without a manual refresh.
+    setTimeout(() => window.location.reload(), 100);
   };
 
   const openArena = (course) => {
@@ -125,56 +172,58 @@ export default function StudentLayout() {
             transition={{ duration: 0.2 }}
             className="flex-1 flex flex-col min-h-screen"
           >
-            <Routes>
-              <Route
-                index
-                element={
-                  <StudentDashboard
-                    user={userProfile}
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    onOpenSyllabus={handleCourseSelect}
-                    onOpenQuiz={openArena}
-                  />
-                }
-              />
-              <Route
-                path="explore"
-                element={
-                  <Explore
-                    user={userProfile}
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    onSelectCourse={handleCourseSelect}
-                  />
-                }
-              />
-              <Route
-                path="progress"
-                element={
-                  <Progress
-                    user={userProfile}
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    onOpenArena={openArena}
-                  />
-                }
-              />
-              <Route
-                path="profile"
-                element={
-                  <Profile
-                    user={userProfile}
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    onLogout={handleLogout}
-                  />
-                }
-              />
-              <Route path="course/:courseId/reader" element={<ReaderRoute />} />
-              <Route path="course/:courseId/arena" element={<ArenaRoute />} />
-              <Route path="*" element={<Navigate to="/student" replace />} />
-            </Routes>
+            <ErrorBoundary>
+              <Routes>
+                <Route
+                  index
+                  element={
+                    <StudentDashboard
+                      user={userProfile}
+                      activeTab={activeTab}
+                      setActiveTab={setActiveTab}
+                      onOpenSyllabus={handleCourseSelect}
+                      onOpenQuiz={openArena}
+                    />
+                  }
+                />
+                <Route
+                  path="explore"
+                  element={
+                    <Explore
+                      user={userProfile}
+                      activeTab={activeTab}
+                      setActiveTab={setActiveTab}
+                      onSelectCourse={handleCourseSelect}
+                    />
+                  }
+                />
+                <Route
+                  path="progress"
+                  element={
+                    <Progress
+                      user={userProfile}
+                      activeTab={activeTab}
+                      setActiveTab={setActiveTab}
+                      onOpenArena={openArena}
+                    />
+                  }
+                />
+                <Route
+                  path="profile"
+                  element={
+                    <Profile
+                      user={userProfile}
+                      activeTab={activeTab}
+                      setActiveTab={setActiveTab}
+                      onLogout={handleLogout}
+                    />
+                  }
+                />
+                <Route path="course/:courseId/reader" element={<ReaderRoute />} />
+                <Route path="course/:courseId/arena" element={<ArenaRoute />} />
+                <Route path="*" element={<Navigate to="/student" replace />} />
+              </Routes>
+            </ErrorBoundary>
           </m.div>
         </AnimatePresence>
 

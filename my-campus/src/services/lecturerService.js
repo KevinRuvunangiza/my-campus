@@ -170,6 +170,15 @@ export async function getFinancialDashboard(lecturerId) {
 
   if (error) throw error;
 
+  // Fetch payouts to calculate the correct available balance
+  const { data: payouts, error: payoutError } = await supabase
+    .from("lecturer_payouts")
+    .select("amount_usd")
+    .eq("lecturer_id", lecturerId)
+    .in("status", ["completed", "requested"]);
+
+  if (payoutError) throw payoutError;
+
   let totalSalesCount = 0;
   let grossRevenueUsd = 0;
   let netLecturerShareUsd = 0;
@@ -184,10 +193,18 @@ export async function getFinancialDashboard(lecturerId) {
     });
   });
 
+  let totalWithdrawnUsd = 0;
+  payouts?.forEach((po) => {
+    totalWithdrawnUsd += Number(po.amount_usd);
+  });
+
+  const availableBalanceUsd = Number((netLecturerShareUsd - totalWithdrawnUsd).toFixed(2));
+
   return {
     totalSalesCount,
     grossRevenueUsd: Number(grossRevenueUsd.toFixed(2)),
-    netLecturerShareUsd: Number(netLecturerShareUsd.toFixed(2)),
+    netLecturerShareUsd: availableBalanceUsd, // now represents the true available balance
+    lifetimeEarningsUsd: Number(netLecturerShareUsd.toFixed(2)), // lifetime share for reporting
     courses,
   };
 }
@@ -198,27 +215,21 @@ export async function requestMobileMoneyCashout({
   provider,
   destinationPhone,
 }) {
-  let dbProvider = "vodacom_mpesa";
-  if (provider === "ORANGE" || provider === "orange_money" || provider === "ORANGE_MONEY") {
-    dbProvider = "orange_money";
-  } else if (provider === "AIRTEL" || provider === "airtel_money" || provider === "AIRTEL_MONEY") {
-    dbProvider = "airtel_money";
+  const { data, error } = await supabase.functions.invoke("process-payout", {
+    body: { amountUsd, provider, destinationPhone },
+  });
+
+  if (error) {
+    let message = error.message || "Le retrait a échoué.";
+    if (error.context) {
+      try {
+        const bodyText = await error.context.text();
+        const bodyJson = JSON.parse(bodyText);
+        message = bodyJson.error || message;
+      } catch (_) {}
+    }
+    throw new Error(message);
   }
 
-  const { data, error } = await supabase
-    .from("lecturer_payouts")
-    .insert([
-      {
-        lecturer_id: lecturerId,
-        amount_usd: Math.round(Number(amountUsd)), // integer column
-        provider: dbProvider,
-        destination_phone: destinationPhone,
-        status: "requested",
-      },
-    ])
-    .select()
-    .single();
-
-  if (error) throw error;
   return data;
 }

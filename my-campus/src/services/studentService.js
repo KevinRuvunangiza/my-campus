@@ -84,6 +84,7 @@ export async function getStudentDashboard() {
 
       return {
         ...courseRaw,
+        isUnlocked: true, // always true — these come from completed purchases
         professor: prof
           ? `${prof.academic_title || "Prof."} ${prof.full_name}`
           : "Professeur",

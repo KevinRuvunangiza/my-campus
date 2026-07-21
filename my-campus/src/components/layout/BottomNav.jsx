@@ -1,11 +1,12 @@
 // src/components/layout/BottomNav.jsx
-import React from "react";
-import { FiCompass, FiBookOpen, FiUser } from "react-icons/fi";
+
+import { FiCompass, FiBookOpen, FiUser, FiBarChart2 } from "react-icons/fi";
 import { m } from "framer-motion";
 
 const NAV_ITEMS = [
   { id: "explorer", label: "Explorer", icon: FiCompass },
   { id: "library", label: "Bibliothèque", icon: FiBookOpen },
+  { id: "stats", label: "Stats", icon: FiBarChart2 },
   { id: "profile", label: "Profil", icon: FiUser },
 ];
 

@@ -154,7 +154,7 @@ export default function LecturerFinancials({ user }) {
           <div className="lg:col-span-4 space-y-5">
             <div className="bg-[#162C3D]/80 border border-[#3D4F58]/60 p-6 rounded-3xl shadow-xl space-y-4">
               <span className="text-[10px] font-mono text-[#00ED64] uppercase font-bold block">
-                Solde Disponible
+                Gains Transférés (70%)
               </span>
               <div className="space-y-1">
                 <span className="text-3xl font-extrabold text-white font-mono">
@@ -184,122 +184,51 @@ export default function LecturerFinancials({ user }) {
               )}
             </div>
 
-            {/* Cashout Request Form */}
-            <div className="bg-[#162C3D]/80 border border-[#3D4F58]/60 p-6 rounded-3xl shadow-xl space-y-4">
+            {/* Automated Payout Info Panel */}
+            <div className="bg-[#162C3D]/80 border border-[#3D4F58]/60 p-6 rounded-3xl shadow-xl space-y-5">
               <div className="flex items-center gap-2.5 border-b border-[#3D4F58]/40 pb-4">
                 <div className="w-8 h-8 rounded-lg bg-[#00ED64]/10 text-[#00ED64] flex items-center justify-center font-bold">
-                  <FiCreditCard className="w-4 h-4" />
+                  <FiCheckCircle className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="font-extrabold text-white text-sm">
-                    Demander un transfert
+                    Transferts Directs Actifs
                   </h3>
-                  <p className="text-[10px] text-slate-400 font-mono">
-                    Paiement Mobile Money instantané
+                  <p className="text-[10px] text-[#00ED64] font-mono uppercase tracking-wider">
+                    Paiement Instantané
                   </p>
                 </div>
               </div>
 
-              {statusMsg.text && (
-                <div
-                  className={`p-3.5 rounded-xl text-xs flex items-start gap-2 font-semibold ${
-                    statusMsg.type === "success"
-                      ? "bg-emerald-950/80 text-emerald-200 border border-[#00ED64]/30"
-                      : "bg-rose-950/80 text-rose-200 border border-rose-500/30"
-                  }`}
-                >
-                  {statusMsg.type === "success" ? (
-                    <FiCheckCircle className="w-4 h-4 shrink-0 text-[#00ED64]" />
-                  ) : (
-                    <FiAlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
-                  )}
-                  <span>{statusMsg.text}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleCashoutSubmit} className="space-y-4 pt-1">
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCashoutProvider("MPESA")}
-                    className={`py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                      cashoutProvider === "MPESA"
-                        ? "bg-[#1C364B] border-[#00ED64] text-white"
-                        : "bg-[#0A222F]/60 border-[#3D4F58]/30 text-slate-400"
-                    }`}
-                  >
-                    M-Pesa
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCashoutProvider("ORANGE")}
-                    className={`py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                      cashoutProvider === "ORANGE"
-                        ? "bg-[#1C364B] border-[#00ED64] text-white"
-                        : "bg-[#0A222F]/60 border-[#3D4F58]/30 text-slate-400"
-                    }`}
-                  >
-                    Orange Money
-                  </button>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Montant à retirer (USD $)
-                  </label>
-                  <div className="relative">
-                    <FiDollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      step="0.10"
-                      value={cashoutAmount}
-                      onChange={(e) => setCashoutAmount(e.target.value)}
-                      placeholder="Ex: 50.00"
-                      className="w-full pl-9 pr-3 py-2.5 bg-[#0A222F] border border-[#3D4F58] rounded-xl text-sm font-mono text-white focus:outline-none focus:border-[#00ED64]"
-                    />
-                  </div>
-                  {cashoutAmount && !isNaN(parseFloat(cashoutAmount)) && (
-                    <span className="text-[10px] text-slate-500 font-mono block mt-1">
-                      Calcul de réception: ~{" "}
-                      {Math.ceil(
-                        parseFloat(cashoutAmount) * exchangeRate,
-                      ).toLocaleString()}{" "}
-                      FC
+              <div className="space-y-4 text-xs text-slate-300 leading-relaxed">
+                <p>
+                  Pour simplifier votre gestion financière, le système de répartition des revenus de Monolith est entièrement automatisé.
+                </p>
+                <div className="p-3.5 bg-[#0A222F]/60 border border-[#3D4F58]/35 rounded-2xl space-y-2">
+                  <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest block">
+                    Numéro de Transfert Enregistré
+                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-white font-extrabold">{user?.phone_number || "Non configuré"}</span>
+                    <span className="text-[10px] font-mono text-[#00ED64] bg-[#00ED64]/10 px-2 py-0.5 rounded border border-[#00ED64]/20">
+                      Vérifié
                     </span>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Numéro Mobile Money cible
-                  </label>
-                  <div className="relative">
-                    <FiPhoneCall className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                    <input
-                      type="tel"
-                      required
-                      value={cashoutPhone}
-                      onChange={(e) => setCashoutPhone(e.target.value)}
-                      placeholder="Ex: 0841234567"
-                      className="w-full pl-9 pr-3 py-2.5 bg-[#0A222F] border border-[#3D4F58] rounded-xl text-sm font-mono text-white focus:outline-none focus:border-[#00ED64]"
-                    />
                   </div>
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={payoutSubmitting}
-                  className="w-full bg-[#00ED64] hover:bg-[#00c753] disabled:opacity-50 text-[#001E2B] font-extrabold py-3.5 rounded-xl shadow-lg transition-colors cursor-pointer text-xs"
-                >
-                  {payoutSubmitting ? (
-                    <div className="w-5 h-5 border-2 border-[#001E2B] border-t-transparent rounded-full animate-spin mx-auto" />
-                  ) : (
-                    "Lancer le retrait"
-                  )}
-                </button>
-              </form>
+                <div className="space-y-2 bg-[#0A222F]/30 p-3 rounded-2xl border border-[#3D4F58]/20">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-400">Part de l'Enseignant</span>
+                    <span className="font-mono text-[#00ED64] font-bold">70 %</span>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-slate-400">Part de la Plateforme (Frais)</span>
+                    <span className="font-mono text-slate-400">30 %</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400 italic">
+                  Dès qu'un étudiant achète l'un de vos syllabus, votre part de 70% est immédiatement transférée sur votre compte Mobile Money. Aucun retrait manuel n'est nécessaire.
+                </p>
+              </div>
             </div>
           </div>
 

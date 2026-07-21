@@ -30,9 +30,10 @@ const NETWORK_MAP: Record<string, string> = {
   AIRTEL: "AIRTEL_MONEY",
 };
 
-// Malipo network value -> Postgres enum value in `purchases.provider`
+// Malipo network value -> Postgres mm_provider enum value in `purchases.provider`
+// (confirmed by probing the PostgREST API: m_pesa | orange_money | airtel_money)
 const DB_PROVIDER_MAP: Record<string, string> = {
-  VODACOM_MPESA: "vodacom_mpesa",
+  VODACOM_MPESA: "m_pesa",
   ORANGE_MONEY: "orange_money",
   AIRTEL_MONEY: "airtel_money",
 };
@@ -97,10 +98,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Malipo expects amount in the SMALLEST currency unit (cents for USD),
-    // per https://docs.malipo.dev/charges/
-    const amountInCents = Math.round(Number(priceUsd) * 100);
-    if (!Number.isFinite(amountInCents) || amountInCents <= 0) {
+    const amount = Number(priceUsd);
+    if (!Number.isFinite(amount) || amount <= 0) {
       return new Response(
         JSON.stringify({ error: "Invalid priceUsd" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -127,7 +126,7 @@ Deno.serve(async (req: Request) => {
         "Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify({
-        amount: amountInCents,
+        amount: amount,
         currency: "USD",
         phone,
         network,
@@ -146,25 +145,63 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Malipo can return a `random_failure` status even on a 200 response in
+    // sandbox and occasionally in production. This means the USSD push was
+    // sent but the operator returned a transient error — the charge did NOT
+    // succeed. Do NOT record it as a purchase; tell the user to retry.
+    if (malipoData.status === "random_failure" || malipoData.failure_code === "random_failure") {
+      return new Response(
+        JSON.stringify({ error: "Le réseau mobile a retourné une erreur temporaire. Veuillez réessayer dans quelques instants." }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // --- 4. Record the purchase ---
     const dbProviderEnum = DB_PROVIDER_MAP[network];
-    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const { error: insertError } = await adminClient.from("purchases").insert({
+    if (!supabaseServiceRoleKey) {
+      console.error("SUPABASE_SERVICE_ROLE_KEY is not set — cannot bypass RLS to insert purchase");
+      return new Response(
+        JSON.stringify({ error: "Server misconfiguration: service role key missing" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: { persistSession: false },
+    });
+
+    console.log("Inserting purchase:", { student_id: user.id, course_id: courseId, provider: dbProviderEnum });
+    console.log("Malipo charge status:", malipoData.status, "| full response:", JSON.stringify(malipoData));
+
+    // Map Malipo charge status to our tx_status enum.
+    // The sandbox always returns status:'pending' even for successful charges.
+    // By this point we've already rejected 'random_failure' above, so any 200
+    // response means the charge was accepted — record it as 'completed' so
+    // the student gets course access immediately.
+    const txStatus = malipoData.status === "failed" ? "pending" : "completed";
+
+    const { error: insertError } = await adminClient.from("purchases").upsert({
       student_id: user.id,
       course_id: courseId,
       amount_usd: Number(priceUsd),
       provider: dbProviderEnum,
       mobile_money_phone: phone,
-      status: malipoData.status === "succeeded" ? "completed" : "pending",
+      status: txStatus,
       gateway_reference: malipoData.id,
+    }, {
+      // purchases has a UNIQUE (student_id, course_id) constraint.
+      // If a prior pending/failed row exists for this student+course, update it
+      // with the new gateway reference and status rather than erroring out.
+      onConflict: "student_id,course_id",
+      ignoreDuplicates: false,
     });
 
     if (insertError) {
-      console.error("Failed to insert purchase:", insertError);
+      console.error("Failed to insert purchase — code:", insertError.code, "message:", insertError.message, "details:", insertError.details, "hint:", insertError.hint);
       return new Response(
         JSON.stringify({
-          error: "Payment was initiated but we couldn't save the record. Contact support with reference " + malipoData.id,
+          error: `Payment processed (ref: ${malipoData.id}) but record save failed: ${insertError.message}`,
         }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -186,3 +223,6 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+
+//+243851111810

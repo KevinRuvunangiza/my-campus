@@ -31,7 +31,10 @@ export default function PaymentModal({ courseId, priceUsd, onSuccess, onClose })
   const [step, setStep] = useState("select"); // "select" | "waiting" | "success"
   const [errorMsg, setErrorMsg] = useState(null);
   const [provider, setProvider] = useState("MPESA");
-  const [phone, setPhone] = useState("");
+  // Default to the Malipo sandbox example phone from https://docs.malipo.dev/quickstart/
+  // Any phone works in sandbox — test behaviors are controlled by the CDF *amount* (100=success, 200=fail, etc.)
+  // Using the docs example "+243812345678" lets us test end-to-end immediately.
+  const [phone, setPhone] = useState("+243812345678");
 
   const attemptIdRef = useRef(0);
 
@@ -146,7 +149,7 @@ export default function PaymentModal({ courseId, priceUsd, onSuccess, onClose })
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full bg-[#162C3D] border border-[#3D4F58]/50 rounded-2xl pl-11 pr-4 py-3.5 text-sm font-mono text-white focus:outline-none focus:border-[#00ED64] transition-colors"
-                  placeholder="Ex: 0841234567"
+                  placeholder="+243812345678 (numéro de test sandbox Malipo)"
                 />
               </div>
             </div>
